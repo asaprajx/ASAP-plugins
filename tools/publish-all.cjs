@@ -64,7 +64,7 @@ fs.mkdirSync(poolDir, { recursive: true })
 const scriptBytes = fs.readFileSync(path.join(root, 'plugins', 'minecraft-servers', 'index.js'))
 const marklongManifestRaw = fs.readFileSync(path.join(root, 'plugins', 'minecraft-servers', 'manifest.json'), 'utf8')
 const marklongManifest = JSON.parse(marklongManifestRaw)
-const marklongVersion = marklongManifest.version || '1.5.3'
+const marklongVersion = marklongManifest.version || '1.5.4'
 
 const marklongZip = createZip([
   ['manifest.json', Buffer.from(JSON.stringify(marklongManifest, null, 2), 'utf8')],
@@ -73,7 +73,7 @@ const marklongZip = createZip([
 const marklongFile = `marklong.minecraft-servers@${marklongVersion}.zip`
 fs.writeFileSync(path.join(poolDir, marklongFile), marklongZip)
 
-const asapVersion = '2.0.4'
+const asapVersion = '2.0.5'
 const asapManifest = {
   format: 1,
   id: 'asaprajx.minecraft-servers',
@@ -153,9 +153,9 @@ fs.writeFileSync(indexPath, jsonStr, { encoding: 'utf8', flag: 'w' })
 
 execSync('git add index.json pool', { cwd: temp, stdio: 'inherit' })
 try {
-  execSync(`git commit -m "Update: remove ping calibration card (v${asapVersion} / v${marklongVersion})"`, { cwd: temp, stdio: 'inherit' })
+  execSync(`git commit -m "Feature: add Power tab with universal host API support (v${asapVersion} / v${marklongVersion})"`, { cwd: temp, stdio: 'inherit' })
   execSync('git push origin gh-pages', { cwd: temp, stdio: 'inherit' })
-  console.log('SUCCESS: Pushed accurate ping update to gh-pages!')
+  console.log('SUCCESS: Pushed Power tab update to gh-pages!')
 } catch (e) {
   console.log('Commit or push error:', e.message)
 }
