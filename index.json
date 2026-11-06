@@ -13,13 +13,13 @@
       ],
       "icon": "GameControllerIcon",
       "channels": {
-        "latest": "2.0.0"
+        "latest": "2.0.1"
       },
       "versions": {
-        "2.0.0": {
-          "url": "https://raw.githubusercontent.com/asaprajx/valenced-plugin-template/gh-pages/pool/asaprajx.minecraft-servers@2.0.0.zip",
-          "sha256": "b9f9be2b7f6feae631972cd99f08dcbf4290c61f1e9778c1d8294debe0323356",
-          "size": 9080,
+        "2.0.1": {
+          "url": "https://raw.githubusercontent.com/asaprajx/valenced-plugin-template/gh-pages/pool/asaprajx.minecraft-servers@2.0.1.zip",
+          "sha256": "e426b3116be5d41a3c3c6029786a3a01ca019c5f26cc79e1e8e408576c4a2bab",
+          "size": 10246,
           "dependencies": {
             "valenced.api": {
               "version": ">=1 <2"
