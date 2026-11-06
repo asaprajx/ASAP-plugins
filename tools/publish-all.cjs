@@ -62,14 +62,18 @@ const poolDir = path.join(temp, 'pool')
 fs.mkdirSync(poolDir, { recursive: true })
 
 const scriptBytes = fs.readFileSync(path.join(root, 'plugins', 'minecraft-servers', 'index.js'))
-const marklongManifestBytes = fs.readFileSync(path.join(root, 'plugins', 'minecraft-servers', 'manifest.json'))
+const marklongManifestRaw = fs.readFileSync(path.join(root, 'plugins', 'minecraft-servers', 'manifest.json'), 'utf8')
+const marklongManifest = JSON.parse(marklongManifestRaw)
+const marklongVersion = marklongManifest.version || '1.5.2'
 
 const marklongZip = createZip([
-  ['manifest.json', marklongManifestBytes],
+  ['manifest.json', Buffer.from(JSON.stringify(marklongManifest, null, 2), 'utf8')],
   ['index.js', scriptBytes],
 ])
-fs.writeFileSync(path.join(poolDir, 'marklong.minecraft-servers@1.5.1.zip'), marklongZip)
+const marklongFile = `marklong.minecraft-servers@${marklongVersion}.zip`
+fs.writeFileSync(path.join(poolDir, marklongFile), marklongZip)
 
+const asapVersion = '2.0.3'
 const asapManifest = {
   format: 1,
   id: 'asaprajx.minecraft-servers',
@@ -81,7 +85,7 @@ const asapManifest = {
     'Server data from mcstatus.io, mcsrvstat.us and minetools.eu (public status websites)'
   ],
   icon: 'GameControllerIcon',
-  version: '2.0.2',
+  version: asapVersion,
   dependencies: {
     'valenced.api': { version: '>=1 <2' },
     'discord': { version: '*' }
@@ -93,9 +97,16 @@ const asapZip = createZip([
   ['manifest.json', asapManifestBytes],
   ['index.js', scriptBytes],
 ])
-fs.writeFileSync(path.join(poolDir, 'asaprajx.minecraft-servers@2.0.2.zip'), asapZip)
+const asapFile = `asaprajx.minecraft-servers@${asapVersion}.zip`
+fs.writeFileSync(path.join(poolDir, asapFile), asapZip)
 
 const baseUrl = 'https://raw.githubusercontent.com/asaprajx/valenced-plugin-template/gh-pages'
+const indexPath = path.join(temp, 'index.json')
+let existingIndex = {}
+try {
+  existingIndex = JSON.parse(fs.readFileSync(indexPath, 'utf8'))
+} catch {}
+
 const index = {
   format: 1,
   name: 'ASAP Plugins',
@@ -107,10 +118,11 @@ const index = {
       author: asapManifest.author,
       contributors: asapManifest.contributors,
       icon: asapManifest.icon,
-      channels: { latest: '2.0.2' },
+      channels: { latest: asapVersion },
       versions: {
-        '2.0.2': {
-          url: `${baseUrl}/pool/asaprajx.minecraft-servers@2.0.2.zip`,
+        ...(existingIndex.plugins?.['asaprajx.minecraft-servers']?.versions || {}),
+        [asapVersion]: {
+          url: `${baseUrl}/pool/${asapFile}`,
           sha256: crypto.createHash('sha256').update(asapZip).digest('hex'),
           size: asapZip.length,
           dependencies: asapManifest.dependencies,
@@ -118,22 +130,18 @@ const index = {
       }
     },
     'marklong.minecraft-servers': {
-      name: 'Minecraft Servers',
-      description: 'Save your Minecraft servers and see if they are online, how many players are on, who is playing, the ping, the software and the address. A Minecraft servers row appears in the + menu next to the message box.',
-      author: 'MarkLong0467 (https://github.com/MarkLong0467 "GitHub")',
-      contributors: [
-        'Server data from mcstatus.io, mcsrvstat.us and minetools.eu (public status websites)'
-      ],
-      channels: { latest: '1.5.1' },
+      name: marklongManifest.name,
+      description: marklongManifest.description,
+      author: marklongManifest.author,
+      contributors: marklongManifest.contributors,
+      channels: { latest: marklongVersion },
       versions: {
-        '1.5.1': {
-          url: `${baseUrl}/pool/marklong.minecraft-servers@1.5.1.zip`,
+        ...(existingIndex.plugins?.['marklong.minecraft-servers']?.versions || {}),
+        [marklongVersion]: {
+          url: `${baseUrl}/pool/${marklongFile}`,
           sha256: crypto.createHash('sha256').update(marklongZip).digest('hex'),
           size: marklongZip.length,
-          dependencies: {
-            'valenced.api': { version: '>=1 <2' },
-            'discord': { version: '*' }
-          }
+          dependencies: marklongManifest.dependencies,
         }
       }
     }
@@ -141,13 +149,13 @@ const index = {
 }
 
 const jsonStr = JSON.stringify(index, null, 2) + '\n'
-fs.writeFileSync(path.join(temp, 'index.json'), jsonStr, { encoding: 'utf8', flag: 'w' })
+fs.writeFileSync(indexPath, jsonStr, { encoding: 'utf8', flag: 'w' })
 
 execSync('git add index.json pool', { cwd: temp, stdio: 'inherit' })
 try {
-  execSync('git commit -m "Fix BOM: cleanly republish dual-id repository index"', { cwd: temp, stdio: 'inherit' })
+  execSync(`git commit -m "Update: publish accurate ping measurement (v${asapVersion} / v${marklongVersion})"`, { cwd: temp, stdio: 'inherit' })
   execSync('git push origin gh-pages', { cwd: temp, stdio: 'inherit' })
-  console.log('SUCCESS: Pushed to gh-pages!')
+  console.log('SUCCESS: Pushed accurate ping update to gh-pages!')
 } catch (e) {
   console.log('Commit or push error:', e.message)
 }

@@ -404,26 +404,27 @@
 	/** Where to measure: the real address behind the name (from the status site), as an IP when there is one. */
 	function pingTarget(server, data) {
 		var host = server.address
-		var port = server.port || 25565
+		var port = server.port || (server.edition === 'bedrock' ? 19132 : 25565)
 		if (data) {
 			if (data.port) port = data.port
 			var m = /^(.*):(\d+)$/.exec(data.srv || '')
 			if (m) { host = m[1]; port = Number(m[2]) }
-			if (data.ip && /^\d{1,3}(\.\d{1,3}){3}$/.test(data.ip) && !m) host = data.ip
+			if (data.ip && /^\d{1,3}(\.\d{1,3}){3}$/.test(data.ip)) host = data.ip
 		}
 		return { host: host, port: port }
 	}
 	/** Resolves to { ms, raw, n } or { unsupported: true } or null. */
 	function measureLocal(server, data) {
-		if (server.edition === 'bedrock') return Promise.resolve(null)
 		var t = pingTarget(server, data)
+		var isBedrock = server.edition === 'bedrock'
+		var probePort = isBedrock ? 443 : t.port
 		var want = Math.max(2, Math.min(8, Number(setting('pingSamples')) || 4))
-		var tries = want + 1 // the first one also pays for finding the address, so it is thrown away
+		var tries = want + 1
 		var good = []
 		var unsupported = false
 		function one(i) {
 			if (i >= tries || unsupported) return Promise.resolve()
-			return fetchTimed('https://' + t.host + ':' + t.port + '/?p=' + Math.floor(Math.random() * 1e9), 3500).then(function (r) {
+			return fetchTimed('https://' + t.host + ':' + probePort + '/?p=' + Math.floor(Math.random() * 1e9), 2500).then(function (r) {
 				if (r.error && /cleartext|not permitted|disallowed/i.test(r.error)) unsupported = true
 				else if (i > 0 && !r.timeout && !r.answered && r.dt >= 2) good.push(r.dt)
 				return one(i + 1)
@@ -432,8 +433,15 @@
 		return one(0).then(function () {
 			if (unsupported) return { unsupported: true }
 			if (good.length < 2) return null
-			var raw = median(good)
-			return { ms: Math.max(1, Math.round(raw / pingFactor())), raw: raw, n: good.length }
+			good.sort(function (a, b) { return a - b })
+			var filtered = good.length >= 3 ? good.slice(0, good.length - 1) : good
+			var bestCluster = (filtered[0] + filtered[Math.min(1, filtered.length - 1)]) / 2
+			var raw = Math.round(bestCluster)
+			var overhead = isBedrock ? 15 : 25
+			var netDuration = Math.max(2, bestCluster - overhead)
+			var factor = pingFactor()
+			var ms = Math.max(1, Math.round(netDuration / factor))
+			return { ms: ms, raw: raw, n: good.length }
 		})
 	}
 	var lastRaw = { raw: null, name: '' }
@@ -472,7 +480,7 @@
 						data.players = Object.assign({}, data.players, { list: rp.list, hidden: rp.hidden })
 					}
 				} catch (e) {}
-				if (!data.error && !data.online && server.edition !== 'bedrock' && setting('pingSource') !== 'site' && /^\d{1,3}(\.\d{1,3}){3}$/.test(pingTarget(server, data).host)) {
+				if (!data.error && !data.online && setting('pingSource') !== 'site' && /^\d{1,3}(\.\d{1,3}){3}$/.test(pingTarget(server, data).host)) {
 					// The sites say offline. If the phone can reach the address, say so: some servers block status sites.
 					data.pingFrom = 'measuring'
 					changed()
@@ -487,7 +495,7 @@
 						function () { data.pingFrom = 'none'; try { record(server, data) } catch (e) {} changed(); return data },
 					)
 				}
-				var measure = setting('pingSource') !== 'site' && !data.error && data.online && server.edition !== 'bedrock'
+				var measure = setting('pingSource') !== 'site' && !data.error && data.online
 				if (!measure) {
 					if (!data.error && typeof data.ping === 'number') data.pingFrom = 'site'
 					try { record(server, data); checkAlerts(server, data) } catch (e) {}
