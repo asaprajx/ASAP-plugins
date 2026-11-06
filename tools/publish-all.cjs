@@ -62,43 +62,17 @@ const poolDir = path.join(temp, 'pool')
 fs.mkdirSync(poolDir, { recursive: true })
 
 const scriptBytes = fs.readFileSync(path.join(root, 'plugins', 'minecraft-servers', 'index.js'))
-const marklongManifestRaw = fs.readFileSync(path.join(root, 'plugins', 'minecraft-servers', 'manifest.json'), 'utf8')
-const marklongManifest = JSON.parse(marklongManifestRaw)
-const marklongVersion = marklongManifest.version || '1.5.6'
+const manifestRaw = fs.readFileSync(path.join(root, 'plugins', 'minecraft-servers', 'manifest.json'), 'utf8')
+const manifest = JSON.parse(manifestRaw)
+const pluginId = manifest.id || 'asaprajx.minecraft-servers'
+const version = manifest.version || '2.0.7'
 
-const marklongZip = createZip([
-  ['manifest.json', Buffer.from(JSON.stringify(marklongManifest, null, 2), 'utf8')],
+const zip = createZip([
+  ['manifest.json', Buffer.from(JSON.stringify(manifest, null, 2), 'utf8')],
   ['index.js', scriptBytes],
 ])
-const marklongFile = `marklong.minecraft-servers@${marklongVersion}.zip`
-fs.writeFileSync(path.join(poolDir, marklongFile), marklongZip)
-
-const asapVersion = '2.0.7'
-const asapManifest = {
-  format: 1,
-  id: 'asaprajx.minecraft-servers',
-  name: 'Minecraft Servers',
-  description: 'Save your Minecraft servers and see if they are online, how many players are on, who is playing, the ping, the software and the address. A Minecraft servers row appears in the + menu next to the message box.',
-  author: 'asaprajx (https://github.com/asaprajx "GitHub")',
-  contributors: [
-    'MarkLong0467 (https://github.com/MarkLong0467 "Original Author")',
-    'Server data from mcstatus.io, mcsrvstat.us and minetools.eu (public status websites)'
-  ],
-  icon: 'GameControllerIcon',
-  version: asapVersion,
-  dependencies: {
-    'valenced.api': { version: '>=1 <2' },
-    'discord': { version: '*' }
-  },
-  dist: { script: 'index.js' }
-}
-const asapManifestBytes = Buffer.from(JSON.stringify(asapManifest, null, 2), 'utf8')
-const asapZip = createZip([
-  ['manifest.json', asapManifestBytes],
-  ['index.js', scriptBytes],
-])
-const asapFile = `asaprajx.minecraft-servers@${asapVersion}.zip`
-fs.writeFileSync(path.join(poolDir, asapFile), asapZip)
+const fileName = `${pluginId}@${version}.zip`
+fs.writeFileSync(path.join(poolDir, fileName), zip)
 
 const baseUrl = 'https://raw.githubusercontent.com/asaprajx/ASAP-plugins/gh-pages'
 const indexPath = path.join(temp, 'index.json')
@@ -112,36 +86,20 @@ const index = {
   name: 'ASAP Plugins',
   description: 'Custom plugins and enhancements for Valenced Discord mobile client.',
   plugins: {
-    'asaprajx.minecraft-servers': {
-      name: asapManifest.name,
-      description: asapManifest.description,
-      author: asapManifest.author,
-      contributors: asapManifest.contributors,
-      icon: asapManifest.icon,
-      channels: { latest: asapVersion },
+    [pluginId]: {
+      name: manifest.name,
+      description: manifest.description,
+      author: manifest.author,
+      contributors: manifest.contributors,
+      icon: manifest.icon || 'GameControllerIcon',
+      channels: { latest: version },
       versions: {
-        ...(existingIndex.plugins?.['asaprajx.minecraft-servers']?.versions || {}),
-        [asapVersion]: {
-          url: `${baseUrl}/pool/${asapFile}`,
-          sha256: crypto.createHash('sha256').update(asapZip).digest('hex'),
-          size: asapZip.length,
-          dependencies: asapManifest.dependencies,
-        }
-      }
-    },
-    'marklong.minecraft-servers': {
-      name: marklongManifest.name,
-      description: marklongManifest.description,
-      author: marklongManifest.author,
-      contributors: marklongManifest.contributors,
-      channels: { latest: marklongVersion },
-      versions: {
-        ...(existingIndex.plugins?.['marklong.minecraft-servers']?.versions || {}),
-        [marklongVersion]: {
-          url: `${baseUrl}/pool/${marklongFile}`,
-          sha256: crypto.createHash('sha256').update(marklongZip).digest('hex'),
-          size: marklongZip.length,
-          dependencies: marklongManifest.dependencies,
+        ...(existingIndex.plugins?.[pluginId]?.versions || {}),
+        [version]: {
+          url: `${baseUrl}/pool/${fileName}`,
+          sha256: crypto.createHash('sha256').update(zip).digest('hex'),
+          size: zip.length,
+          dependencies: manifest.dependencies,
         }
       }
     }
@@ -153,9 +111,9 @@ fs.writeFileSync(indexPath, jsonStr, { encoding: 'utf8', flag: 'w' })
 
 execSync('git add index.json pool', { cwd: temp, stdio: 'inherit' })
 try {
-  execSync(`git commit -m "Fix: accurate offline/online status without false positives (v${asapVersion} / v${marklongVersion})"`, { cwd: temp, stdio: 'inherit' })
+  execSync(`git commit -m "Publish: ${pluginId} v${version}"`, { cwd: temp, stdio: 'inherit' })
   execSync('git push origin gh-pages', { cwd: temp, stdio: 'inherit' })
-  console.log('SUCCESS: Pushed accurate status update to gh-pages!')
+  console.log(`SUCCESS: Published ${pluginId} v${version} to gh-pages!`)
 } catch (e) {
   console.log('Commit or push error:', e.message)
 }
