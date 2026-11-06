@@ -5,6 +5,7 @@
 	"scripts": {
 		"build": "valenced-plugin build",
 		"build:dev": "valenced-plugin build --dev",
+		"publish": "node tools/publish-all.cjs",
 		"generate-index": "valenced-plugin generate-index",
 		"plan-releases": "valenced-plugin plan-releases --plugins-dir plugins --plugins-dir themes",
 		"serve": "valenced-plugin serve",
