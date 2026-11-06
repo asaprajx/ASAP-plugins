@@ -34,7 +34,6 @@ export function SettingsComponent({ api }: { api: { jsonStorage: { use: () => Pl
 				if (Array.isArray(parsed)) importedServers = parsed
 				else if (Array.isArray(parsed?.servers)) importedServers = parsed.servers
 			} catch {
-				// plain lines
 				const lines = text.split(/[\r\n,;]+/).map(l => l.trim()).filter(Boolean)
 				importedServers = lines.map(address => ({ address }))
 			}
@@ -74,48 +73,75 @@ export function SettingsComponent({ api }: { api: { jsonStorage: { use: () => Pl
 	}
 
 	return (
-		<Design.TableRowGroup title="General Settings">
-			<Design.TableSwitchRow
-				label="Show Player Avatars & Icons"
-				subLabel="Display custom server icons when available"
-				value={settings?.icons ?? true}
-				onValueChange={(icons: boolean) => update({ icons })}
-			/>
-			<Design.TableSwitchRow
-				label="Show Player Heads"
-				subLabel="Display Minecraft player skins / head avatars"
-				value={settings?.heads ?? true}
-				onValueChange={(heads: boolean) => update({ heads })}
-			/>
-			<Design.TableSwitchRow
-				label="Compact Mode"
-				subLabel="Use denser server rows in the list"
-				value={settings?.compact ?? false}
-				onValueChange={(compact: boolean) => update({ compact })}
-			/>
-			<Design.TableSwitchRow
-				label="Live Player Counts"
-				subLabel="Query live minetools count alongside cached metadata"
-				value={settings?.liveCounts ?? true}
-				onValueChange={(liveCounts: boolean) => update({ liveCounts })}
-			/>
-			<Design.TableSwitchRow
-				label="Server Status Alerts"
-				subLabel="Toast notification when watched servers go online or offline"
-				value={settings?.alerts ?? false}
-				onValueChange={(alerts: boolean) => update({ alerts })}
-			/>
+		<>
+			<Design.TableRowGroup title="Button Placement">
+				<Design.TableRow
+					label="Open from"
+					subLabel={
+						settings?.placement === 'right'
+							? 'Floating button (Right side above chat)'
+							: settings?.placement === 'left'
+								? 'Floating button (Left side above chat)'
+								: '+ Action Menu (Default)'
+					}
+				/>
+				<Design.TableSwitchRow
+					label="Floating Button (Right)"
+					subLabel="Show quick-access button above message box on the right"
+					value={settings?.placement === 'right'}
+					onValueChange={(val: boolean) => update({ placement: val ? 'right' : 'menu' })}
+				/>
+				<Design.TableSwitchRow
+					label="Floating Button (Left)"
+					subLabel="Show quick-access button above message box on the left"
+					value={settings?.placement === 'left'}
+					onValueChange={(val: boolean) => update({ placement: val ? 'left' : 'menu' })}
+				/>
+			</Design.TableRowGroup>
 
-			<Design.TableRow
-				label="Export Servers to Clipboard"
-				subLabel="Copy your saved servers as JSON backup"
-				onPress={exportBackup}
-			/>
-			<Design.TableRow
-				label="Import Servers from Clipboard"
-				subLabel="Add servers from a JSON backup or address list in clipboard"
-				onPress={importBackup}
-			/>
-		</Design.TableRowGroup>
+			<Design.TableRowGroup title="General Settings">
+				<Design.TableSwitchRow
+					label="Show Player Avatars & Icons"
+					subLabel="Display custom server icons when available"
+					value={settings?.icons ?? true}
+					onValueChange={(icons: boolean) => update({ icons })}
+				/>
+				<Design.TableSwitchRow
+					label="Show Player Heads"
+					subLabel="Display Minecraft player skins / head avatars"
+					value={settings?.heads ?? true}
+					onValueChange={(heads: boolean) => update({ heads })}
+				/>
+				<Design.TableSwitchRow
+					label="Compact Mode"
+					subLabel="Use denser server rows in the list"
+					value={settings?.compact ?? false}
+					onValueChange={(compact: boolean) => update({ compact })}
+				/>
+				<Design.TableSwitchRow
+					label="Live Player Counts"
+					subLabel="Query live minetools count alongside cached metadata"
+					value={settings?.liveCounts ?? true}
+					onValueChange={(liveCounts: boolean) => update({ liveCounts })}
+				/>
+				<Design.TableSwitchRow
+					label="Server Status Alerts"
+					subLabel="Toast notification when watched servers go online or offline"
+					value={settings?.alerts ?? false}
+					onValueChange={(alerts: boolean) => update({ alerts })}
+				/>
+
+				<Design.TableRow
+					label="Export Servers to Clipboard"
+					subLabel="Copy your saved servers as JSON backup"
+					onPress={exportBackup}
+				/>
+				<Design.TableRow
+					label="Import Servers from Clipboard"
+					subLabel="Add servers from a JSON backup or address list in clipboard"
+					onPress={importBackup}
+				/>
+			</Design.TableRowGroup>
+		</>
 	)
 }

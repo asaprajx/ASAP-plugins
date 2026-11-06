@@ -8,7 +8,7 @@
 		"MarkLong0467 (https://github.com/MarkLong0467 \"Original Author\")",
 		"Server data from mcstatus.io, mcsrvstat.us and minetools.eu"
 	],
-	"version": "2.0.0",
+	"version": "2.0.1",
 	"icon": "GameControllerIcon",
 	"dependencies": {
 		"valenced.api": {
