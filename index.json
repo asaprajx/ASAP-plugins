@@ -2,34 +2,5 @@
   "format": 1,
   "name": "ASAP Plugins",
   "description": "Custom plugins and enhancements for Valenced Discord mobile client.",
-  "plugins": {
-    "asaprajx.minecraft-servers": {
-      "name": "Minecraft Servers",
-      "description": "Save your Minecraft servers and check status, live player counts, who is playing, ping, software and address right inside Discord.",
-      "author": "asaprajx (https://github.com/asaprajx \"GitHub\")",
-      "contributors": [
-        "MarkLong0467 (https://github.com/MarkLong0467 \"Original Author\")",
-        "Server data from mcstatus.io, mcsrvstat.us and minetools.eu"
-      ],
-      "icon": "GameControllerIcon",
-      "channels": {
-        "latest": "2.0.1"
-      },
-      "versions": {
-        "2.0.1": {
-          "url": "https://raw.githubusercontent.com/asaprajx/valenced-plugin-template/gh-pages/pool/asaprajx.minecraft-servers@2.0.1.zip",
-          "sha256": "e426b3116be5d41a3c3c6029786a3a01ca019c5f26cc79e1e8e408576c4a2bab",
-          "size": 10246,
-          "dependencies": {
-            "valenced.api": {
-              "version": ">=1 <2"
-            },
-            "discord": {
-              "version": "*"
-            }
-          }
-        }
-      }
-    }
-  }
+  "plugins": {}
 }
