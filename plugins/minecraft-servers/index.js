@@ -210,21 +210,21 @@
 			label: 'mcstatus.io',
 			get: function (server, seconds) {
 				var kind = server.edition === 'bedrock' ? 'bedrock' : 'java'
-				return timeoutFetch('https://api.mcstatus.io/v2/status/' + kind + '/' + target(server), seconds).then(function (j) { return fromMcstatus(server, j) })
+				return timeoutFetch('https://api.mcstatus.io/v2/status/' + kind + '/' + target(server) + '?_ts=' + Date.now(), seconds).then(function (j) { return fromMcstatus(server, j) })
 			},
 		},
 		mcsrvstat: {
 			label: 'mcsrvstat.us',
 			get: function (server, seconds) {
 				var prefix = server.edition === 'bedrock' ? 'bedrock/3/' : '3/'
-				return timeoutFetch('https://api.mcsrvstat.us/' + prefix + target(server), seconds).then(function (j) { return fromMcsrvstat(server, j) })
+				return timeoutFetch('https://api.mcsrvstat.us/' + prefix + target(server) + '?_ts=' + Date.now(), seconds).then(function (j) { return fromMcsrvstat(server, j) })
 			},
 		},
 		minetools: {
 			label: 'minetools.eu',
 			get: function (server, seconds) {
 				if (server.edition === 'bedrock') return Promise.reject(new Error('minetools.eu only knows Java servers'))
-				return timeoutFetch('https://api.minetools.eu/ping/' + encodeURIComponent(server.address) + '/' + (server.port || 25565), seconds).then(function (j) { return fromMinetools(server, j) })
+				return timeoutFetch('https://api.minetools.eu/ping/' + encodeURIComponent(server.address) + '/' + (server.port || 25565) + '?_ts=' + Date.now(), seconds).then(function (j) { return fromMinetools(server, j) })
 			},
 		},
 	}
@@ -480,13 +480,20 @@
 						data.players = Object.assign({}, data.players, { list: rp.list, hidden: rp.hidden })
 					}
 				} catch (e) {}
-				if (!data.error && !data.online && setting('pingSource') !== 'site' && /^\d{1,3}(\.\d{1,3}){3}$/.test(pingTarget(server, data).host)) {
-					// The sites say offline. If the phone can reach the address, say so: some servers block status sites.
+				if (!data.error && !data.online && setting('pingSource') !== 'site') {
+					// If status sites say offline (often due to 3-5 min CDN cache), verify directly from the phone.
 					data.pingFrom = 'measuring'
 					changed()
 					return measureLocal(server, data).then(
 						function (p) {
-							if (p && !p.unsupported) { data.phoneReachable = true; data.ping = p.ms; data.pingFrom = 'phone'; data.rawPing = p.raw }
+							if (p && !p.unsupported) {
+								data.online = true
+								data.phoneReachable = true
+								data.ping = p.ms
+								data.pingFrom = 'phone'
+								data.rawPing = p.raw
+								if (!data.motd) data.motd = 'Online (verified directly from your phone)'
+							}
 							else data.pingFrom = 'none'
 							try { record(server, data); checkAlerts(server, data) } catch (e) {}
 							changed()
@@ -551,8 +558,7 @@
 		var d = r.data
 		if (!d) return { key: 'loading', label: 'Checking…', color: GRAY }
 		if (d.error) return { key: 'error', label: 'No answer', color: AMBER }
-		if (d.online) return { key: 'online', label: 'Online', color: GREEN }
-		if (d.phoneReachable) return { key: 'reachable', label: 'Reachable', color: AMBER }
+		if (d.online || d.phoneReachable) return { key: 'online', label: 'Online', color: GREEN }
 		return { key: 'offline', label: 'Offline', color: RED }
 	}
 	function playersText(d) {
@@ -1076,7 +1082,10 @@
 				if (res.ok) {
 					toast('🟢 Power signal sent successfully!')
 					powerMsgState[1]({ ok: true, msg: 'Power signal sent (' + res.status + ')' })
-					setTimeout(function () { check(s, true) }, 3000)
+					setTimeout(function () { check(s, true) }, 4000)
+					setTimeout(function () { check(s, true) }, 12000)
+					setTimeout(function () { check(s, true) }, 24000)
+					setTimeout(function () { check(s, true) }, 40000)
 				} else {
 					var err = 'Failed (' + res.status + ')'
 					if (res.status === 401 || res.status === 403) {
