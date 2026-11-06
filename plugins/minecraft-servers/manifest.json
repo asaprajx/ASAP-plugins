@@ -7,7 +7,7 @@
 	"contributors": [
 		"Server data from mcstatus.io, mcsrvstat.us and minetools.eu (public status websites)"
 	],
-	"version": "1.5.2",
+	"version": "1.5.3",
 	"dependencies": {
 		"valenced.api": {
 			"version": ">=1 <2"

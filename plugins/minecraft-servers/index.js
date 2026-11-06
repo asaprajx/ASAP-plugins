@@ -1424,7 +1424,6 @@
 		storage = props.api.jsonStorage
 		storage.use()
 		var tick = React.useState(0)
-		var known = React.useState('')
 		React.useEffect(function () {
 			var update = function () { tick[1](function (n) { return n + 1 }) }
 			listeners.push(update)
@@ -1496,25 +1495,6 @@
 				toggle('plainScroll', 'Plain scrolling in panels', 'Turn this on if a panel will not scroll or looks wrong. Off uses the sheet\'s own scrolling when it can be found.'),
 				toggle('liveCounts', 'Live player count', 'Status sites keep an answer for a minute or more, so a player who just joined can be missing. This also asks minetools.eu, which asks the server itself.'),
 				radio('Ping measurements', 'pingSamples', [{ value: '3', label: '3 tries', subLabel: 'Quicker' }, { value: '4', label: '4 tries' }, { value: '6', label: '6 tries', subLabel: 'Steadier' }], true),
-				h(
-					Card,
-					null,
-					T({ variant: 'heading-md/bold' }, 'Ping calibration'),
-					T({ variant: 'text-sm/medium', color: 'text-muted' }, 'The ping is estimated by timing how fast a server closes a connection and dividing by a factor. The factor is now ' + pingFactor().toFixed(1) + '. If the game shows a different ping, type what the game shows and tap Calibrate: the plugin uses its latest measurement to set the factor for you.'),
-					lastRaw.raw ? T({ variant: 'text-xs/medium', color: 'text-muted' }, 'Latest measurement: ' + Math.round(lastRaw.raw) + ' ms (' + lastRaw.name + '), shown as ' + Math.max(1, Math.round(lastRaw.raw / pingFactor())) + ' ms') : T({ variant: 'text-xs/medium', color: 'text-muted' }, 'No measurement yet. Open the list and let a server finish checking.'),
-					h(Design.TextInput, { label: 'Ping the game shows (ms)', placeholder: '80', size: 'md', value: known[0], onChange: function (v) { known[1](String(v).replace(/[^0-9]/g, '')) } }),
-					h(Row2, null, [
-						h(Button, { key: 'cal', text: 'Calibrate', variant: 'primary', onPress: function () {
-							var k = Number(known[0])
-							if (!lastRaw.raw || !k) { toast('Open a server first, then type the ping the game shows'); return }
-							var f = Math.max(0.5, Math.min(6, lastRaw.raw / k))
-							save({ pingFactor: Math.round(f * 100) / 100 })
-							toast('Factor set to ' + f.toFixed(2))
-							changed()
-						} }),
-						h(Button, { key: 'reset', text: 'Reset to 2.0', onPress: function () { save({ pingFactor: 2 }); toast('Factor reset'); changed() } }),
-					]),
-				),
 				radio('Wait for an answer', 'timeout', [{ value: '5', label: '5 seconds' }, { value: '8', label: '8 seconds' }, { value: '12', label: '12 seconds' }, { value: '20', label: '20 seconds' }], true),
 				radio('Keep an answer', 'cacheSeconds', [{ value: '0', label: 'Always check again' }, { value: '20', label: '20 seconds', subLabel: 'Opening the list again right away does not ask again' }, { value: '60', label: '1 minute' }, { value: '300', label: '5 minutes' }], true),
 				radio('While a panel is open', 'refreshSeconds2', [{ value: '0', label: 'Only when I tap Refresh' }, { value: '15', label: 'Every 15 seconds' }, { value: '30', label: 'Every 30 seconds', subLabel: 'The list and a server\'s screen update by themselves' }, { value: '60', label: 'Every minute' }], true),

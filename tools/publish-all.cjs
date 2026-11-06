@@ -56,7 +56,7 @@ function createZip(files) {
 const root = path.join(__dirname, '..')
 const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'valenced-gh-'))
 console.log('Cloning gh-pages to:', temp)
-execSync(`git clone --branch gh-pages https://github.com/asaprajx/valenced-plugin-template.git "${temp}"`, { stdio: 'inherit' })
+execSync(`git clone --branch gh-pages https://github.com/asaprajx/ASAP-plugins.git "${temp}"`, { stdio: 'inherit' })
 
 const poolDir = path.join(temp, 'pool')
 fs.mkdirSync(poolDir, { recursive: true })
@@ -64,7 +64,7 @@ fs.mkdirSync(poolDir, { recursive: true })
 const scriptBytes = fs.readFileSync(path.join(root, 'plugins', 'minecraft-servers', 'index.js'))
 const marklongManifestRaw = fs.readFileSync(path.join(root, 'plugins', 'minecraft-servers', 'manifest.json'), 'utf8')
 const marklongManifest = JSON.parse(marklongManifestRaw)
-const marklongVersion = marklongManifest.version || '1.5.2'
+const marklongVersion = marklongManifest.version || '1.5.3'
 
 const marklongZip = createZip([
   ['manifest.json', Buffer.from(JSON.stringify(marklongManifest, null, 2), 'utf8')],
@@ -73,7 +73,7 @@ const marklongZip = createZip([
 const marklongFile = `marklong.minecraft-servers@${marklongVersion}.zip`
 fs.writeFileSync(path.join(poolDir, marklongFile), marklongZip)
 
-const asapVersion = '2.0.3'
+const asapVersion = '2.0.4'
 const asapManifest = {
   format: 1,
   id: 'asaprajx.minecraft-servers',
@@ -100,7 +100,7 @@ const asapZip = createZip([
 const asapFile = `asaprajx.minecraft-servers@${asapVersion}.zip`
 fs.writeFileSync(path.join(poolDir, asapFile), asapZip)
 
-const baseUrl = 'https://raw.githubusercontent.com/asaprajx/valenced-plugin-template/gh-pages'
+const baseUrl = 'https://raw.githubusercontent.com/asaprajx/ASAP-plugins/gh-pages'
 const indexPath = path.join(temp, 'index.json')
 let existingIndex = {}
 try {
@@ -153,7 +153,7 @@ fs.writeFileSync(indexPath, jsonStr, { encoding: 'utf8', flag: 'w' })
 
 execSync('git add index.json pool', { cwd: temp, stdio: 'inherit' })
 try {
-  execSync(`git commit -m "Update: publish accurate ping measurement (v${asapVersion} / v${marklongVersion})"`, { cwd: temp, stdio: 'inherit' })
+  execSync(`git commit -m "Update: remove ping calibration card (v${asapVersion} / v${marklongVersion})"`, { cwd: temp, stdio: 'inherit' })
   execSync('git push origin gh-pages', { cwd: temp, stdio: 'inherit' })
   console.log('SUCCESS: Pushed accurate ping update to gh-pages!')
 } catch (e) {
