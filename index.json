@@ -13,7 +13,7 @@
       ],
       "icon": "GameControllerIcon",
       "channels": {
-        "latest": "2.0.3"
+        "latest": "2.0.4"
       },
       "versions": {
         "2.0.2": {
@@ -41,6 +41,19 @@
               "version": "*"
             }
           }
+        },
+        "2.0.4": {
+          "url": "https://raw.githubusercontent.com/asaprajx/ASAP-plugins/gh-pages/pool/asaprajx.minecraft-servers@2.0.4.zip",
+          "sha256": "452bc2d8cb7774e4436570734c42b1d2da9d596b2dac6c50e769b6f4de973525",
+          "size": 23580,
+          "dependencies": {
+            "valenced.api": {
+              "version": ">=1 <2"
+            },
+            "discord": {
+              "version": "*"
+            }
+          }
         }
       }
     },
@@ -52,7 +65,7 @@
         "Server data from mcstatus.io, mcsrvstat.us and minetools.eu (public status websites)"
       ],
       "channels": {
-        "latest": "1.5.2"
+        "latest": "1.5.3"
       },
       "versions": {
         "1.5.1": {
@@ -72,6 +85,19 @@
           "url": "https://raw.githubusercontent.com/asaprajx/valenced-plugin-template/gh-pages/pool/marklong.minecraft-servers@1.5.2.zip",
           "sha256": "8bef3bc88ef7eaaff6348be45bb66de27a791a0b2fc72f46a3afaa3b6f0537eb",
           "size": 23979,
+          "dependencies": {
+            "valenced.api": {
+              "version": ">=1 <2"
+            },
+            "discord": {
+              "version": "*"
+            }
+          }
+        },
+        "1.5.3": {
+          "url": "https://raw.githubusercontent.com/asaprajx/ASAP-plugins/gh-pages/pool/marklong.minecraft-servers@1.5.3.zip",
+          "sha256": "ffbb53310649f2b47a8d36976419889377bc1bbf4b88a0a7d63c4efcbe218f61",
+          "size": 23541,
           "dependencies": {
             "valenced.api": {
               "version": ">=1 <2"
