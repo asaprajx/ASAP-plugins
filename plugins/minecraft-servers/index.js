@@ -306,13 +306,7 @@
 						: Promise.resolve(first)
 					return again.then(function (m) {
 						if (m && m.online) return applyLive(merge(good.online ? good : m, [good.online ? m : good]), m)
-						if (good.online && m) {
-							// The cached answer says online, the live one says offline: the server probably just went down (or blocks the live site).
-							var o = merge(good, [m])
-							o.online = false
-							o.siteConflict = true
-							return o
-						}
+						if (good.online) return applyLive(merge(good, m ? [m] : []), m || good)
 						if (good.online) return good
 						// Offline for both: one more site, in case the first two cannot reach the server.
 						return settle([PROVIDERS.mcsrvstat.get(server, seconds)]).then(function (got) {
@@ -480,20 +474,13 @@
 						data.players = Object.assign({}, data.players, { list: rp.list, hidden: rp.hidden })
 					}
 				} catch (e) {}
-				if (!data.error && !data.online && setting('pingSource') !== 'site') {
-					// If status sites say offline (often due to 3-5 min CDN cache), verify directly from the phone.
+				if (!data.error && !data.online && setting('pingSource') !== 'site' && /^\d{1,3}(\.\d{1,3}){3}$/.test(pingTarget(server, data).host)) {
+					// The sites say offline. If the phone can reach the address, say so: some servers block status sites.
 					data.pingFrom = 'measuring'
 					changed()
 					return measureLocal(server, data).then(
 						function (p) {
-							if (p && !p.unsupported) {
-								data.online = true
-								data.phoneReachable = true
-								data.ping = p.ms
-								data.pingFrom = 'phone'
-								data.rawPing = p.raw
-								if (!data.motd) data.motd = 'Online (verified directly from your phone)'
-							}
+							if (p && !p.unsupported) { data.phoneReachable = true; data.ping = p.ms; data.pingFrom = 'phone'; data.rawPing = p.raw }
 							else data.pingFrom = 'none'
 							try { record(server, data); checkAlerts(server, data) } catch (e) {}
 							changed()
@@ -558,7 +545,8 @@
 		var d = r.data
 		if (!d) return { key: 'loading', label: 'Checking…', color: GRAY }
 		if (d.error) return { key: 'error', label: 'No answer', color: AMBER }
-		if (d.online || d.phoneReachable) return { key: 'online', label: 'Online', color: GREEN }
+		if (d.online) return { key: 'online', label: 'Online', color: GREEN }
+		if (d.phoneReachable) return { key: 'reachable', label: 'Reachable', color: AMBER }
 		return { key: 'offline', label: 'Offline', color: RED }
 	}
 	function playersText(d) {
