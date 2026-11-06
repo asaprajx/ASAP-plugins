@@ -1,61 +1,61 @@
-﻿{
-    "format":  1,
-    "name":  "ASAP Plugins",
-    "description":  "Custom plugins and enhancements for Valenced Discord mobile client.",
-    "plugins":  {
-                    "marklong.minecraft-servers":  {
-                                                       "name":  "Minecraft Servers",
-                                                       "description":  "Save your Minecraft servers and see if they are online, how many players are on, who is playing, the ping, the software and the address. A Minecraft servers row appears in the + menu next to the message box.",
-                                                       "author":  "MarkLong0467 (https://github.com/MarkLong0467 \"GitHub\")",
-                                                       "channels":  {
-                                                                        "latest":  "1.5.1"
-                                                                    },
-                                                       "versions":  {
-                                                                        "1.5.1":  {
-                                                                                      "url":  "https://raw.githubusercontent.com/asaprajx/valenced-plugin-template/gh-pages/pool/marklong.minecraft-servers@1.5.1.zip",
-                                                                                      "sha256":  "79231a4320d4201dbdf3ac5030dc9d9cdb5fd931772f6411cd34563594b0abad",
-                                                                                      "size":  23900,
-                                                                                      "dependencies":  {
-                                                                                                           "valenced.api":  {
-                                                                                                                                "version":  "\u003e=1 \u003c2"
-                                                                                                                            },
-                                                                                                           "discord":  {
-                                                                                                                           "version":  "*"
-                                                                                                                       }
-                                                                                                       }
-                                                                                  }
-                                                                    },
-                                                       "contributors":  [
-                                                                            "Server data from mcstatus.io, mcsrvstat.us and minetools.eu (public status websites)"
-                                                                        ]
-                                                   },
-                    "asaprajx.minecraft-servers":  {
-                                                       "name":  "Minecraft Servers",
-                                                       "description":  "Save your Minecraft servers and see if they are online, how many players are on, who is playing, the ping, the software and the address. A Minecraft servers row appears in the + menu next to the message box.",
-                                                       "author":  "asaprajx (https://github.com/asaprajx \"GitHub\")",
-                                                       "contributors":  [
-                                                                            "MarkLong0467 (https://github.com/MarkLong0467 \"Original Author\")",
-                                                                            "Server data from mcstatus.io, mcsrvstat.us and minetools.eu (public status websites)"
-                                                                        ],
-                                                       "icon":  "GameControllerIcon",
-                                                       "channels":  {
-                                                                        "latest":  "2.0.2"
-                                                                    },
-                                                       "versions":  {
-                                                                        "2.0.2":  {
-                                                                                      "url":  "https://raw.githubusercontent.com/asaprajx/valenced-plugin-template/gh-pages/pool/asaprajx.minecraft-servers@2.0.2.zip",
-                                                                                      "sha256":  "44226a611fcc8235ab93655c6eac40fe385dc33d78dfd5bbe1bdb46e8e086a82",
-                                                                                      "size":  23944,
-                                                                                      "dependencies":  {
-                                                                                                           "valenced.api":  {
-                                                                                                                                "version":  "\u003e=1 \u003c2"
-                                                                                                                            },
-                                                                                                           "discord":  {
-                                                                                                                           "version":  "*"
-                                                                                                                       }
-                                                                                                       }
-                                                                                  }
-                                                                    }
-                                                   }
-                }
+{
+  "format": 1,
+  "name": "ASAP Plugins",
+  "description": "Custom plugins and enhancements for Valenced Discord mobile client.",
+  "plugins": {
+    "asaprajx.minecraft-servers": {
+      "name": "Minecraft Servers",
+      "description": "Save your Minecraft servers and see if they are online, how many players are on, who is playing, the ping, the software and the address. A Minecraft servers row appears in the + menu next to the message box.",
+      "author": "asaprajx (https://github.com/asaprajx \"GitHub\")",
+      "contributors": [
+        "MarkLong0467 (https://github.com/MarkLong0467 \"Original Author\")",
+        "Server data from mcstatus.io, mcsrvstat.us and minetools.eu (public status websites)"
+      ],
+      "icon": "GameControllerIcon",
+      "channels": {
+        "latest": "2.0.2"
+      },
+      "versions": {
+        "2.0.2": {
+          "url": "https://raw.githubusercontent.com/asaprajx/valenced-plugin-template/gh-pages/pool/asaprajx.minecraft-servers@2.0.2.zip",
+          "sha256": "3e405304effb75974d05b549f8b283018d5a572c8445b976182d6cd339fb4697",
+          "size": 23938,
+          "dependencies": {
+            "valenced.api": {
+              "version": ">=1 <2"
+            },
+            "discord": {
+              "version": "*"
+            }
+          }
+        }
+      }
+    },
+    "marklong.minecraft-servers": {
+      "name": "Minecraft Servers",
+      "description": "Save your Minecraft servers and see if they are online, how many players are on, who is playing, the ping, the software and the address. A Minecraft servers row appears in the + menu next to the message box.",
+      "author": "MarkLong0467 (https://github.com/MarkLong0467 \"GitHub\")",
+      "contributors": [
+        "Server data from mcstatus.io, mcsrvstat.us and minetools.eu (public status websites)"
+      ],
+      "channels": {
+        "latest": "1.5.1"
+      },
+      "versions": {
+        "1.5.1": {
+          "url": "https://raw.githubusercontent.com/asaprajx/valenced-plugin-template/gh-pages/pool/marklong.minecraft-servers@1.5.1.zip",
+          "sha256": "79231a4320d4201dbdf3ac5030dc9d9cdb5fd931772f6411cd34563594b0abad",
+          "size": 23900,
+          "dependencies": {
+            "valenced.api": {
+              "version": ">=1 <2"
+            },
+            "discord": {
+              "version": "*"
+            }
+          }
+        }
+      }
+    }
+  }
 }
