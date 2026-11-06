@@ -2,5 +2,32 @@
   "format": 1,
   "name": "ASAP Plugins",
   "description": "Custom plugins and enhancements for Valenced Discord mobile client.",
-  "plugins": {}
+  "plugins": {
+    "marklong.minecraft-servers": {
+      "name": "Minecraft Servers",
+      "description": "Save your Minecraft servers and see if they are online, how many players are on, who is playing, the ping, the software and the address. A Minecraft servers row appears in the + menu next to the message box.",
+      "author": "MarkLong0467 (https://github.com/MarkLong0467 \"GitHub\")",
+      "channels": {
+        "latest": "1.5.1"
+      },
+      "versions": {
+        "1.5.1": {
+          "url": "https://raw.githubusercontent.com/asaprajx/valenced-plugin-template/gh-pages/pool/marklong.minecraft-servers@1.5.1.zip",
+          "sha256": "79231a4320d4201dbdf3ac5030dc9d9cdb5fd931772f6411cd34563594b0abad",
+          "size": 23900,
+          "dependencies": {
+            "valenced.api": {
+              "version": ">=1 <2"
+            },
+            "discord": {
+              "version": "*"
+            }
+          }
+        }
+      },
+      "contributors": [
+        "Server data from mcstatus.io, mcsrvstat.us and minetools.eu (public status websites)"
+      ]
+    }
+  }
 }
