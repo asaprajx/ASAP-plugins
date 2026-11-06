@@ -1,0 +1,22 @@
+{
+	"format": 1,
+	"id": "marklong.minecraft-servers",
+	"name": "Minecraft Servers",
+	"description": "Save your Minecraft servers and see if they are online, how many players are on, who is playing, the ping, the software and the address. A Minecraft servers row appears in the + menu next to the message box.",
+	"author": "MarkLong0467 (https://github.com/MarkLong0467 \"GitHub\")",
+	"contributors": [
+		"Server data from mcstatus.io, mcsrvstat.us and minetools.eu (public status websites)"
+	],
+	"version": "1.5.1",
+	"dependencies": {
+		"valenced.api": {
+			"version": ">=1 <2"
+		},
+		"discord": {
+			"version": "*"
+		}
+	},
+	"dist": {
+		"script": "index.js"
+	}
+}
