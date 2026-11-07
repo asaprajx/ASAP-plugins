@@ -65,7 +65,7 @@ const scriptBytes = fs.readFileSync(path.join(root, 'plugins', 'minecraft-server
 const manifestRaw = fs.readFileSync(path.join(root, 'plugins', 'minecraft-servers', 'manifest.json'), 'utf8')
 const manifest = JSON.parse(manifestRaw)
 const pluginId = manifest.id || 'asaprajx.minecraft-servers'
-const version = manifest.version || '2.0.7'
+const version = manifest.version || '2.0.8'
 
 const zip = createZip([
   ['manifest.json', Buffer.from(JSON.stringify(manifest, null, 2), 'utf8')],
