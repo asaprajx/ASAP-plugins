@@ -13,3 +13,7 @@ node_modules/
 .DS_Store
 .idea/
 *.iml
+
+# Local Agent & Project Summaries
+PROJECT_SUMMARY.md
+AGENTS.md
