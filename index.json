@@ -132,7 +132,7 @@
       ],
       "icon": "MusicIcon",
       "channels": {
-        "latest": "1.0.2"
+        "latest": "1.0.3"
       },
       "versions": {
         "1.0.0": {
@@ -178,6 +178,19 @@
           "url": "https://raw.githubusercontent.com/asaprajx/ASAP-plugins/gh-pages/pool/asaprajx.yt-music@1.0.2.zip",
           "sha256": "f12e2676a8a941bf17f7eff3f4b5d852908ab39a69e7d1d7c5876e2066e63166",
           "size": 14115,
+          "dependencies": {
+            "valenced.api": {
+              "version": ">=1 <2"
+            },
+            "discord": {
+              "version": "*"
+            }
+          }
+        },
+        "1.0.3": {
+          "url": "https://raw.githubusercontent.com/asaprajx/ASAP-plugins/gh-pages/pool/asaprajx.yt-music@1.0.3.zip",
+          "sha256": "b7029528e01243ad88bf8cb4efe3c8f2325de25f87fcf1ce7522c3b45af73dc8",
+          "size": 14133,
           "dependencies": {
             "valenced.api": {
               "version": ">=1 <2"
