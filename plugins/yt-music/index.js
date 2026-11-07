@@ -26,7 +26,7 @@
 		audioQuality: 'medium',
 		autoPlayNext: true,
 		showMiniPlayer: true,
-		miniPlayerPlacement: 'above_input', // 'above_input' | 'none'
+		miniPlayerPlacement: 'above_input',
 		savedQueue: '[]',
 		savedHistory: '[]'
 	}
@@ -195,51 +195,6 @@
 				reject(err)
 			})
 		})
-	}
-
-	// ======================================================================================
-	// BottomSheet Scrolling Helpers (Prevents Gesture Conflicts)
-	// ======================================================================================
-	var scrollPick = null
-	var boundaryClass = null
-	function sheetScrollComponent() {
-		var RN = valenced.react.ReactNative
-		if (scrollPick) return scrollPick
-		var pick = RN.ScrollView
-		try {
-			var D = valenced.discord.design.Design
-			var c = D && (D.BottomSheetScrollView || D.ActionSheetScrollView)
-			if (!c) {
-				var f = finders()
-				var m = f.lookupModule(f.filters.withProps('BottomSheetScrollView'))[0]
-				c = m && m.BottomSheetScrollView
-			}
-			if (c) pick = c
-		} catch (e) {}
-		scrollPick = pick
-		return pick
-	}
-
-	function scrollBoundary() {
-		if (boundaryClass) return boundaryClass
-		var React = valenced.react.React
-		if (typeof React.Component !== 'function') return null
-		boundaryClass = class extends React.Component {
-			constructor(p) { super(p); this.state = { bad: false } }
-			static getDerivedStateFromError() { return { bad: true } }
-			componentDidCatch() {}
-			render() { return this.state.bad ? this.props.fallback : this.props.children }
-		}
-		return boundaryClass
-	}
-
-	function renderScrollView(scrollProps, children) {
-		var RN = valenced.react.ReactNative
-		var Scroll = sheetScrollComponent()
-		var plain = h(RN.ScrollView, scrollProps, children)
-		var Boundary = Scroll === RN.ScrollView ? null : scrollBoundary()
-		if (!Boundary) return plain
-		return h(Boundary, { fallback: plain }, h(Scroll, scrollProps, children))
 	}
 
 	// ======================================================================================
@@ -833,6 +788,19 @@
 		return rt.jsx(Design.Text, p, key)
 	}
 
+	function Button(props) {
+		var Design = valenced.discord.design.Design
+		return h(Design.Button, {
+			text: props.text,
+			size: props.size || 'md',
+			variant: props.variant || 'secondary',
+			loading: props.loading,
+			onPress: props.onPress,
+			disabled: props.disabled,
+			style: props.style
+		})
+	}
+
 	function findIcon(names) {
 		for (var i = 0; i < names.length; i++) {
 			var icon = valenced.utils.discord.lookupGeneratedIconComponent(names[i])
@@ -1122,7 +1090,6 @@
 		var PauseIcon = findIcon(['PauseIcon', 'StopIcon'])
 		var NextIcon = findIcon(['NextIcon', 'FastForwardIcon'])
 		var PrevIcon = findIcon(['PreviousIcon', 'RewindIcon'])
-		var SearchIcon = findIcon(['SearchIcon', 'MagnifyingGlassIcon'])
 		var MusicIcon = findIcon(['MusicIcon', 'HeadphonesIcon'])
 		var TrashIcon = findIcon(['TrashIcon', 'DeleteIcon'])
 
@@ -1132,7 +1099,7 @@
 		var Tap = RN.Pressable || RN.TouchableOpacity
 
 		var win = RN.useWindowDimensions ? RN.useWindowDimensions() : { height: 750 }
-		var scrollMax = Math.max(300, Math.round(win.height - 160))
+		var scrollMax = Math.max(320, Math.round(win.height - 160))
 
 		var tabButtons = [
 			{ key: 'now_playing', label: 'Now Playing' },
@@ -1144,14 +1111,9 @@
 		return h(
 			Design.ActionSheet,
 			null,
-			renderScrollView(
-				{
-					style: { maxHeight: scrollMax },
-					contentContainerStyle: { padding: 16, paddingBottom: 32 },
-					keyboardShouldPersistTaps: 'handled',
-					nestedScrollEnabled: true,
-					showsVerticalScrollIndicator: true
-				},
+			h(
+				RN.View,
+				{ style: { padding: 16, maxHeight: scrollMax } },
 				// Top Tab Bar
 				h(
 					RN.View,
@@ -1186,8 +1148,8 @@
 
 				// TAB 1: NOW PLAYING & LYRICS
 				currentTab === 'now_playing' ? h(
-					RN.View,
-					{ style: { alignItems: 'center', width: '100%' } },
+					RN.ScrollView,
+					{ style: { width: '100%' }, showsVerticalScrollIndicator: false, contentContainerStyle: { alignItems: 'center', paddingBottom: 24 } },
 					track ? [
 						// Big Cover Art
 						track.thumbnail
@@ -1302,7 +1264,7 @@
 										RN.ScrollView,
 										{
 											ref: function (ref) { activeLyricScrollRef.current = ref },
-											style: { maxHeight: 140 },
+											style: { maxHeight: 130 },
 											nestedScrollEnabled: true,
 											showsVerticalScrollIndicator: true
 										},
@@ -1354,138 +1316,150 @@
 				// TAB 2: SEARCH SONGS
 				currentTab === 'search' ? h(
 					RN.View,
-					{ style: { width: '100%' } },
-					// Native Robust Search Bar
+					{ style: { width: '100%', flex: 1 } },
+					// Full width native Discord TextInput
+					h(Design.TextInput, {
+						placeholder: 'Search songs, artists, albums...',
+						size: 'md',
+						value: String(searchText || ''),
+						onChange: function (val) {
+							var textVal = typeof val === 'string' ? val : (val && val.nativeEvent && val.nativeEvent.text) || ''
+							setSearchText(textVal)
+						},
+						onSubmitEditing: function () {
+							performSearch(searchText)
+						}
+					}),
+					// Buttons Row
 					h(
 						RN.View,
-						{
-							style: {
-								flexDirection: 'row',
-								alignItems: 'center',
-								backgroundColor: surfaceTertiary(),
-								borderRadius: 10,
-								paddingHorizontal: 12,
-								height: 46,
-								marginBottom: 12
-							}
-						},
-						SearchIcon ? h(SearchIcon, { size: 'sm', color: textMuted(), style: { marginRight: 8 } }) : null,
-						h(RN.TextInput, {
-							value: searchText,
-							onChangeText: setSearchText,
-							onSubmitEditing: function () { performSearch(searchText) },
-							placeholder: 'Search songs, artists, albums...',
-							placeholderTextColor: textMuted(),
-							returnKeyType: 'search',
-							autoCorrect: false,
-							style: {
-								flex: 1,
-								height: 42,
-								color: textNormal(),
-								fontSize: 14,
-								padding: 0
-							}
+						{ style: { flexDirection: 'row', gap: 10, marginTop: 10, marginBottom: 12 } },
+						h(Button, {
+							text: searchState.loading ? 'Searching...' : 'Search',
+							variant: 'primary',
+							disabled: searchState.loading || !String(searchText || '').trim(),
+							loading: searchState.loading,
+							onPress: function () { performSearch(searchText) },
+							style: { flex: 1 }
 						}),
-						searchText ? h(
-							Tap,
-							{
-								onPress: function () {
-									setSearchText('')
-									searchState.results = []
-									changed()
-								},
-								style: { padding: 6 }
-							},
-							T({ variant: 'text-xs/bold', style: { color: textMuted() } }, 'X')
-						) : null,
-						h(
-							Tap,
-							{
-								onPress: function () { performSearch(searchText) },
-								style: {
-									backgroundColor: ACCENT_COLOR,
-									borderRadius: 8,
-									paddingHorizontal: 12,
-									paddingVertical: 6,
-									marginLeft: 8
-								}
-							},
-							T({ variant: 'text-xs/bold', style: { color: '#ffffff' } }, searchState.loading ? '...' : 'Go')
-						)
+						String(searchText || '').trim() ? h(Button, {
+							text: 'Clear',
+							variant: 'secondary',
+							onPress: function () {
+								setSearchText('')
+								searchState.results = []
+								searchState.error = ''
+								changed()
+							}
+						}) : null
 					),
 
 					// Search Status / Loading / Error
 					searchState.loading ? T({ variant: 'text-sm/medium', style: { color: textMuted(), textAlign: 'center', marginVertical: 16 } }, 'Searching YouTube Music...') : null,
 					searchState.error ? T({ variant: 'text-sm/medium', style: { color: '#f23f43', textAlign: 'center', marginVertical: 12 } }, searchState.error) : null,
 
-					// Results List
-					searchState.results.map(function (s) {
-						return h(
+					// Quick Search Suggestions when empty
+					searchState.results.length === 0 && !searchState.loading && !searchState.error ? h(
+						RN.View,
+						{ style: { alignItems: 'center', marginVertical: 18, gap: 10 } },
+						T({ variant: 'text-sm/medium', style: { color: textMuted(), textAlign: 'center' } }, 'Tap a quick genre to browse music:'),
+						h(
 							RN.View,
-							{
-								key: s.videoId,
-								style: {
-									flexDirection: 'row',
-									alignItems: 'center',
-									padding: 10,
-									borderRadius: 10,
-									backgroundColor: surfaceTertiary(),
-									marginBottom: 8,
-									gap: 10
-								}
-							},
-							// Thumbnail
-							s.thumbnail
-								? h(RN.Image, {
-									source: { uri: s.thumbnail },
-									style: { width: 44, height: 44, borderRadius: 8, backgroundColor: surface() }
-								})
-								: (MusicIcon ? h(MusicIcon, { size: 'md', color: ACCENT_COLOR }) : null),
-							// Title & Info
-							h(
-								RN.View,
-								{ style: { flex: 1 } },
-								T({ variant: 'text-sm/bold', numberOfLines: 1, style: { color: textNormal() } }, s.title),
-								T({ variant: 'text-xs/medium', numberOfLines: 1, style: { color: textMuted(), marginTop: 2 } }, s.artist + (s.duration ? ' • ' + s.duration : ''))
-							),
-							// Action Buttons: Play Now & Add Queue
-							h(
-								Tap,
-								{
-									onPress: function () {
-										playTrack(s)
-										setTab('now_playing')
+							{ style: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 8 } },
+							['Top Hits', 'Lo-Fi Beats', 'Chill Mix', 'Rock Classics', 'Pop 2026'].map(function (genre) {
+								return h(
+									Tap,
+									{
+										key: genre,
+										onPress: function () {
+											setSearchText(genre)
+											performSearch(genre)
+										},
+										style: {
+											backgroundColor: surfaceTertiary(),
+											paddingHorizontal: 12,
+											paddingVertical: 7,
+											borderRadius: 16
+										}
 									},
-									style: {
-										backgroundColor: ACCENT_COLOR,
-										paddingVertical: 6,
-										paddingHorizontal: 10,
-										borderRadius: 6
-									}
-								},
-								T({ variant: 'text-xs/bold', style: { color: '#fff' } }, 'Play')
-							),
-							h(
-								Tap,
-								{
-									onPress: function () { addToQueue(s) },
-									style: {
-										backgroundColor: surface(),
-										paddingVertical: 6,
-										paddingHorizontal: 8,
-										borderRadius: 6
-									}
-								},
-								T({ variant: 'text-xs/bold', style: { color: textNormal() } }, '+ Queue')
-							)
+									T({ variant: 'text-xs/bold', style: { color: textNormal() } }, genre)
+								)
+							})
 						)
-					})
+					) : null,
+
+					// Results ScrollView
+					h(
+						RN.ScrollView,
+						{ style: { maxHeight: scrollMax - 140 }, nestedScrollEnabled: true, showsVerticalScrollIndicator: true },
+						searchState.results.map(function (s) {
+							return h(
+								RN.View,
+								{
+									key: s.videoId,
+									style: {
+										flexDirection: 'row',
+										alignItems: 'center',
+										padding: 10,
+										borderRadius: 10,
+										backgroundColor: surfaceTertiary(),
+										marginBottom: 8,
+										gap: 10
+									}
+								},
+								// Thumbnail
+								s.thumbnail
+									? h(RN.Image, {
+										source: { uri: s.thumbnail },
+										style: { width: 44, height: 44, borderRadius: 8, backgroundColor: surface() }
+									})
+									: (MusicIcon ? h(MusicIcon, { size: 'md', color: ACCENT_COLOR }) : null),
+								// Title & Info
+								h(
+									RN.View,
+									{ style: { flex: 1 } },
+									T({ variant: 'text-sm/bold', numberOfLines: 1, style: { color: textNormal() } }, s.title),
+									T({ variant: 'text-xs/medium', numberOfLines: 1, style: { color: textMuted(), marginTop: 2 } }, s.artist + (s.duration ? ' • ' + s.duration : ''))
+								),
+								// Action Buttons: Play Now & Add Queue
+								h(
+									Tap,
+									{
+										onPress: function () {
+											playTrack(s)
+											setTab('now_playing')
+										},
+										style: {
+											backgroundColor: ACCENT_COLOR,
+											paddingVertical: 6,
+											paddingHorizontal: 10,
+											borderRadius: 6
+										}
+									},
+									T({ variant: 'text-xs/bold', style: { color: '#fff' } }, 'Play')
+								),
+								h(
+									Tap,
+									{
+										onPress: function () { addToQueue(s) },
+										style: {
+											backgroundColor: surface(),
+											paddingVertical: 6,
+											paddingHorizontal: 8,
+											borderRadius: 6
+										}
+									},
+									T({ variant: 'text-xs/bold', style: { color: textNormal() } }, '+ Queue')
+								)
+							)
+						})
+					)
 				) : null,
 
 				// TAB 3: UP NEXT QUEUE & HISTORY
 				currentTab === 'queue' ? h(
-					RN.View,
-					{ style: { width: '100%' } },
+					RN.ScrollView,
+					{ style: { width: '100%', maxHeight: scrollMax - 80 }, showsVerticalScrollIndicator: true },
 					// Header & Clear Queue
 					h(
 						RN.View,
@@ -1578,8 +1552,8 @@
 
 				// TAB 4: SETTINGS & ABOUT
 				currentTab === 'settings' ? h(
-					RN.View,
-					{ style: { width: '100%' } },
+					RN.ScrollView,
+					{ style: { width: '100%', maxHeight: scrollMax - 80 }, showsVerticalScrollIndicator: true },
 					h(
 						Design.TableRowGroup,
 						{ title: 'Playback Preferences' },
@@ -1619,7 +1593,7 @@
 						h(Design.TableRow, {
 							key: 'abt-1',
 							label: 'YouTube Music for Valenced',
-							subLabel: 'Version 1.0.1 by asaprajx. Stream ad-free music with LRCLIB synchronized lyrics.'
+							subLabel: 'Version 1.0.2 by asaprajx. Stream ad-free music with LRCLIB synchronized lyrics.'
 						})
 					)
 				) : null
@@ -1706,7 +1680,7 @@
 				h(Design.TableRow, {
 					key: 'set-abt',
 					label: 'YouTube Music for Valenced',
-					subLabel: 'Version 1.0.1 by asaprajx. Stream ad-free music with LRCLIB synchronized lyrics.'
+					subLabel: 'Version 1.0.2 by asaprajx. Stream ad-free music with LRCLIB synchronized lyrics.'
 				})
 			)
 		)
