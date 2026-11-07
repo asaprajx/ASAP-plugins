@@ -61,19 +61,6 @@ execSync(`git clone --branch gh-pages https://github.com/asaprajx/ASAP-plugins.g
 const poolDir = path.join(temp, 'pool')
 fs.mkdirSync(poolDir, { recursive: true })
 
-const scriptBytes = fs.readFileSync(path.join(root, 'plugins', 'minecraft-servers', 'index.js'))
-const manifestRaw = fs.readFileSync(path.join(root, 'plugins', 'minecraft-servers', 'manifest.json'), 'utf8')
-const manifest = JSON.parse(manifestRaw)
-const pluginId = manifest.id || 'asaprajx.minecraft-servers'
-const version = manifest.version || '2.0.9'
-
-const zip = createZip([
-  ['manifest.json', Buffer.from(JSON.stringify(manifest, null, 2), 'utf8')],
-  ['index.js', scriptBytes],
-])
-const fileName = `${pluginId}@${version}.zip`
-fs.writeFileSync(path.join(poolDir, fileName), zip)
-
 const baseUrl = 'https://raw.githubusercontent.com/asaprajx/ASAP-plugins/gh-pages'
 const indexPath = path.join(temp, 'index.json')
 let existingIndex = {}
@@ -86,24 +73,54 @@ const index = {
   name: 'ASAP Plugins',
   description: 'Custom plugins and enhancements for Valenced Discord mobile client.',
   plugins: {
-    [pluginId]: {
-      name: manifest.name,
-      description: manifest.description,
-      author: manifest.author,
-      contributors: manifest.contributors,
-      icon: manifest.icon || 'GameControllerIcon',
-      channels: { latest: version },
-      versions: {
-        ...(existingIndex.plugins?.[pluginId]?.versions || {}),
-        [version]: {
-          url: `${baseUrl}/pool/${fileName}`,
-          sha256: crypto.createHash('sha256').update(zip).digest('hex'),
-          size: zip.length,
-          dependencies: manifest.dependencies,
-        }
+    ...(existingIndex.plugins || {})
+  }
+}
+
+const pluginsDir = path.join(root, 'plugins')
+const pluginFolders = fs.readdirSync(pluginsDir).filter(f => {
+  const p = path.join(pluginsDir, f)
+  return fs.statSync(p).isDirectory() &&
+         fs.existsSync(path.join(p, 'manifest.json')) &&
+         fs.existsSync(path.join(p, 'index.js'))
+})
+
+const publishedList = []
+
+for (const folder of pluginFolders) {
+  const pluginPath = path.join(pluginsDir, folder)
+  const scriptBytes = fs.readFileSync(path.join(pluginPath, 'index.js'))
+  const manifest = JSON.parse(fs.readFileSync(path.join(pluginPath, 'manifest.json'), 'utf8'))
+  const pluginId = manifest.id
+  const version = manifest.version || '1.0.0'
+
+  const zip = createZip([
+    ['manifest.json', Buffer.from(JSON.stringify(manifest, null, 2), 'utf8')],
+    ['index.js', scriptBytes],
+  ])
+  const fileName = `${pluginId}@${version}.zip`
+  fs.writeFileSync(path.join(poolDir, fileName), zip)
+
+  index.plugins[pluginId] = {
+    name: manifest.name,
+    description: manifest.description,
+    author: manifest.author,
+    contributors: manifest.contributors,
+    icon: manifest.icon || 'HelpIcon',
+    channels: { latest: version },
+    versions: {
+      ...(existingIndex.plugins?.[pluginId]?.versions || {}),
+      [version]: {
+        url: `${baseUrl}/pool/${fileName}`,
+        sha256: crypto.createHash('sha256').update(zip).digest('hex'),
+        size: zip.length,
+        dependencies: manifest.dependencies,
       }
     }
   }
+
+  publishedList.push(`${pluginId} v${version}`)
+  console.log(`Packaged: ${pluginId} v${version}`)
 }
 
 const jsonStr = JSON.stringify(index, null, 2) + '\n'
@@ -111,9 +128,10 @@ fs.writeFileSync(indexPath, jsonStr, { encoding: 'utf8', flag: 'w' })
 
 execSync('git add index.json pool', { cwd: temp, stdio: 'inherit' })
 try {
-  execSync(`git commit -m "Publish: ${pluginId} v${version}"`, { cwd: temp, stdio: 'inherit' })
+  const commitMsg = `Publish: ${publishedList.join(', ')}`
+  execSync(`git commit -m "${commitMsg}"`, { cwd: temp, stdio: 'inherit' })
   execSync('git push origin gh-pages', { cwd: temp, stdio: 'inherit' })
-  console.log(`SUCCESS: Published ${pluginId} v${version} to gh-pages!`)
+  console.log(`SUCCESS: Published to gh-pages! (${publishedList.join(', ')})`)
 } catch (e) {
   console.log('Commit or push error:', e.message)
 }
