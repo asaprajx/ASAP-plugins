@@ -13,7 +13,7 @@
       ],
       "icon": "GameControllerIcon",
       "channels": {
-        "latest": "2.0.7"
+        "latest": "2.0.8"
       },
       "versions": {
         "2.0.2": {
@@ -85,6 +85,19 @@
           "url": "https://raw.githubusercontent.com/asaprajx/ASAP-plugins/gh-pages/pool/asaprajx.minecraft-servers@2.0.7.zip",
           "sha256": "efc1e0700f460c4e90a10f7f9afe5dbef66f339ff97f28916abd9f7b20c5fe61",
           "size": 25562,
+          "dependencies": {
+            "valenced.api": {
+              "version": ">=1 <2"
+            },
+            "discord": {
+              "version": "*"
+            }
+          }
+        },
+        "2.0.8": {
+          "url": "https://raw.githubusercontent.com/asaprajx/ASAP-plugins/gh-pages/pool/asaprajx.minecraft-servers@2.0.8.zip",
+          "sha256": "071edda74e81a3fc3f34320abbd4673743eea73bf431b85ca7fa672b9e751a56",
+          "size": 23527,
           "dependencies": {
             "valenced.api": {
               "version": ">=1 <2"
