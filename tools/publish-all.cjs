@@ -121,6 +121,37 @@ for (const folder of pluginFolders) {
 
   publishedList.push(`${pluginId} v${version}`)
   console.log(`Packaged: ${pluginId} v${version}`)
+
+  // Migration alias: Also update existing asaprajx.yt-music installations to receive the new JioSaavn player
+  if (pluginId === 'asaprajx.jiosaavn') {
+    const ytManifest = { ...manifest, id: 'asaprajx.yt-music' }
+    const ytZip = createZip([
+      ['manifest.json', Buffer.from(JSON.stringify(ytManifest, null, 2), 'utf8')],
+      ['index.js', scriptBytes],
+    ])
+    const ytFileName = `asaprajx.yt-music@${version}.zip`
+    fs.writeFileSync(path.join(poolDir, ytFileName), ytZip)
+
+    index.plugins['asaprajx.yt-music'] = {
+      name: manifest.name,
+      description: manifest.description,
+      author: manifest.author,
+      contributors: manifest.contributors,
+      icon: manifest.icon || 'HelpIcon',
+      channels: { latest: version },
+      versions: {
+        ...(existingIndex.plugins?.['asaprajx.yt-music']?.versions || {}),
+        [version]: {
+          url: `${baseUrl}/pool/${ytFileName}`,
+          sha256: crypto.createHash('sha256').update(ytZip).digest('hex'),
+          size: ytZip.length,
+          dependencies: manifest.dependencies,
+        }
+      }
+    }
+    publishedList.push(`asaprajx.yt-music v${version}`)
+    console.log(`Packaged alias: asaprajx.yt-music v${version}`)
+  }
 }
 
 const jsonStr = JSON.stringify(index, null, 2) + '\n'

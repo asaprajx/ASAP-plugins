@@ -1,15 +1,15 @@
 {
   "format": 1,
-  "id": "asaprajx.yt-music",
-  "name": "YouTube Music",
-  "description": "Stream ad-free music inside Discord with synchronized lyrics, search, queue management, and background playback.",
+  "id": "asaprajx.jiosaavn",
+  "name": "JioSaavn",
+  "description": "Stream ad-free high quality (320kbps) music inside Discord via JioSaavn with synchronized lyrics, search, queue management, and background playback.",
   "author": "asaprajx (https://github.com/asaprajx \"GitHub\")",
   "contributors": [
-    "YouTube Music & Invidious community",
+    "JioSaavn",
     "LRCLIB (https://lrclib.net \"Lyrics API\")"
   ],
   "icon": "MusicIcon",
-  "version": "1.0.5",
+  "version": "1.0.6",
   "dependencies": {
     "valenced.api": {
       "version": ">=1 <2"
