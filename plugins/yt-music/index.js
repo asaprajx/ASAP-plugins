@@ -73,26 +73,7 @@
 	// Core Utilities & Metro Finders
 	// ======================================================================================
 	function finders() {
-		return (
-			valenced.modules.finders || {
-				lookupModule: function (predicate) {
-					return [valenced.metro.find(predicate)].filter(Boolean)
-				},
-				filters: {
-					withProps: function () {
-						var props = Array.prototype.slice.call(arguments)
-						return function (m) {
-							return m && props.every(function (p) { return m[p] !== undefined })
-						}
-					},
-					withName: function (name) {
-						return function (m) {
-							return m && (m.name === name || m.displayName === name || (m.default && (m.default.name === name || m.default.displayName === name)))
-						}
-					}
-				}
-			}
-		)
+		return valenced.modules.finders
 	}
 
 	function setting(key) {
@@ -998,6 +979,40 @@
 	// Plus Menu Injection
 	// ======================================================================================
 	var PLUS_LABELS = { Camera: 1, Photos: 1, Poll: 1, Files: 1, Apps: 1 }
+	var PLUS_ICONS = [
+		/ic_camera/i, /ic_image/i, /ic_poll/i, /ic_attachment/i, /ic_thread/i, /ic_gift/i,
+		/CameraIcon/i, /PhotosIcon/i, /ImageIcon/i, /PollIcon/i, /FileIcon/i, /ThreadIcon/i, /GiftIcon/i
+	]
+	var assetNames = new Map()
+	function iconName(item) {
+		if (!item) return ''
+		var src = item.iconSource
+		if (typeof src === 'string') return src
+		if (typeof src === 'number') {
+			if (assetNames.has(src)) return assetNames.get(src)
+			var name = ''
+			try {
+				var a = valenced.assets.AssetsRegistry.getAssetByID(src)
+				name = (a && a.name) || ''
+			} catch (e) {}
+			assetNames.set(src, name)
+			return name
+		}
+		var Component = item.IconComponent
+		return (Component && (Component.displayName || Component.name)) || ''
+	}
+	function plusScore(items) {
+		var found = 0
+		for (var j = 0; j < items.length; j++) {
+			var nm = iconName(items[j])
+			if (nm) {
+				for (var k = 0; k < PLUS_ICONS.length; k++) {
+					if (PLUS_ICONS[k].test(nm)) { found++; break }
+				}
+			}
+		}
+		return found
+	}
 	function decoratePlusItems(result, items) {
 		for (var i = 0; i < items.length; i++) {
 			if (items[i] && items[i].__ytMusic) return result
@@ -1045,7 +1060,7 @@
 				var hasKnown = props.items.some(function (it) {
 					return it && typeof it.label === 'string' && PLUS_LABELS[it.label]
 				})
-				if (hasKnown) return decoratePlusItems(result, props.items)
+				if (hasKnown || plusScore(props.items) >= 2) return decoratePlusItems(result, props.items)
 			}
 			return result
 		} catch (e) {
@@ -1591,12 +1606,11 @@
 						h(Design.TableRow, {
 							key: 'abt-1',
 							label: 'YouTube Music for Valenced',
-							subLabel: 'Version 1.0.3 by asaprajx. Stream ad-free music with LRCLIB synchronized lyrics.'
+							subLabel: 'Version 1.0.4 by asaprajx. Stream ad-free music with LRCLIB synchronized lyrics.'
 						})
 					)
 				) : null
-			),
-			h(AudioPlayerHost, null)
+			)
 		)
 	}
 
@@ -1678,7 +1692,7 @@
 				h(Design.TableRow, {
 					key: 'set-abt',
 					label: 'YouTube Music for Valenced',
-					subLabel: 'Version 1.0.3 by asaprajx. Stream ad-free music with LRCLIB synchronized lyrics.'
+					subLabel: 'Version 1.0.4 by asaprajx. Stream ad-free music with LRCLIB synchronized lyrics.'
 				})
 			)
 		)
@@ -1687,10 +1701,8 @@
 	// ======================================================================================
 	// Plugin Registration & Lifecycle
 	// ======================================================================================
-	var definePlugin = typeof plugin === 'function' ? plugin : (valenced.plugin || function (def) { return def })
-
 	Object.defineProperty(exports, Symbol.toStringTag, { value: 'Module' })
-	exports.default = definePlugin({
+	exports.default = plugin({
 		jsonStorage: { load: true, default: defaults },
 		SettingsComponent: SettingsComponent,
 		start: function (api) {
