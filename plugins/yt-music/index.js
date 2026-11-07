@@ -1099,7 +1099,7 @@
 		var Tap = RN.Pressable || RN.TouchableOpacity
 
 		var win = RN.useWindowDimensions ? RN.useWindowDimensions() : { height: 750 }
-		var scrollMax = Math.max(320, Math.round(win.height - 160))
+		var scrollMax = Math.max(380, Math.round(win.height - 140))
 
 		var tabButtons = [
 			{ key: 'now_playing', label: 'Now Playing' },
@@ -1113,7 +1113,7 @@
 			null,
 			h(
 				RN.View,
-				{ style: { padding: 16, maxHeight: scrollMax } },
+				{ style: { padding: 16, minHeight: 380, maxHeight: scrollMax } },
 				// Top Tab Bar
 				h(
 					RN.View,
@@ -1149,7 +1149,7 @@
 				// TAB 1: NOW PLAYING & LYRICS
 				currentTab === 'now_playing' ? h(
 					RN.ScrollView,
-					{ style: { width: '100%' }, showsVerticalScrollIndicator: false, contentContainerStyle: { alignItems: 'center', paddingBottom: 24 } },
+					{ style: { width: '100%', maxHeight: scrollMax - 70 }, showsVerticalScrollIndicator: false, contentContainerStyle: { alignItems: 'center', paddingBottom: 28 } },
 					track ? [
 						// Big Cover Art
 						track.thumbnail
@@ -1313,10 +1313,15 @@
 					]
 				) : null,
 
-				// TAB 2: SEARCH SONGS
+				// TAB 2: SEARCH SONGS (Clean standalone vertical flow)
 				currentTab === 'search' ? h(
-					RN.View,
-					{ style: { width: '100%', flex: 1 } },
+					RN.ScrollView,
+					{
+						style: { width: '100%', minHeight: 280, maxHeight: scrollMax - 70 },
+						contentContainerStyle: { paddingBottom: 32 },
+						keyboardShouldPersistTaps: 'handled',
+						showsVerticalScrollIndicator: true
+					},
 					// Full width native Discord TextInput
 					h(Design.TextInput, {
 						placeholder: 'Search songs, artists, albums...',
@@ -1333,7 +1338,7 @@
 					// Buttons Row
 					h(
 						RN.View,
-						{ style: { flexDirection: 'row', gap: 10, marginTop: 10, marginBottom: 12 } },
+						{ style: { flexDirection: 'row', gap: 10, marginTop: 12, marginBottom: 14 } },
 						h(Button, {
 							text: searchState.loading ? 'Searching...' : 'Search',
 							variant: 'primary',
@@ -1355,14 +1360,14 @@
 					),
 
 					// Search Status / Loading / Error
-					searchState.loading ? T({ variant: 'text-sm/medium', style: { color: textMuted(), textAlign: 'center', marginVertical: 16 } }, 'Searching YouTube Music...') : null,
-					searchState.error ? T({ variant: 'text-sm/medium', style: { color: '#f23f43', textAlign: 'center', marginVertical: 12 } }, searchState.error) : null,
+					searchState.loading ? T({ variant: 'text-sm/medium', style: { color: textMuted(), textAlign: 'center', marginVertical: 14 } }, 'Searching YouTube Music...') : null,
+					searchState.error ? T({ variant: 'text-sm/medium', style: { color: '#f23f43', textAlign: 'center', marginVertical: 10 } }, searchState.error) : null,
 
 					// Quick Search Suggestions when empty
 					searchState.results.length === 0 && !searchState.loading && !searchState.error ? h(
 						RN.View,
-						{ style: { alignItems: 'center', marginVertical: 18, gap: 10 } },
-						T({ variant: 'text-sm/medium', style: { color: textMuted(), textAlign: 'center' } }, 'Tap a quick genre to browse music:'),
+						{ style: { alignItems: 'center', marginVertical: 14, gap: 10 } },
+						T({ variant: 'text-sm/medium', style: { color: textMuted(), textAlign: 'center' } }, 'Quick suggestions:'),
 						h(
 							RN.View,
 							{ style: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 8 } },
@@ -1388,78 +1393,71 @@
 						)
 					) : null,
 
-					// Results ScrollView
-					h(
-						RN.ScrollView,
-						{ style: { maxHeight: scrollMax - 140 }, nestedScrollEnabled: true, showsVerticalScrollIndicator: true },
-						searchState.results.map(function (s) {
-							return h(
+					// Results List
+					searchState.results.map(function (s) {
+						return h(
+							RN.View,
+							{
+								key: s.videoId,
+								style: {
+									flexDirection: 'row',
+									alignItems: 'center',
+									padding: 10,
+									borderRadius: 10,
+									backgroundColor: surfaceTertiary(),
+									marginBottom: 8,
+									gap: 10
+								}
+							},
+							s.thumbnail
+								? h(RN.Image, {
+									source: { uri: s.thumbnail },
+									style: { width: 44, height: 44, borderRadius: 8, backgroundColor: surface() }
+								})
+								: (MusicIcon ? h(MusicIcon, { size: 'md', color: ACCENT_COLOR }) : null),
+							h(
 								RN.View,
+								{ style: { flex: 1 } },
+								T({ variant: 'text-sm/bold', numberOfLines: 1, style: { color: textNormal() } }, s.title),
+								T({ variant: 'text-xs/medium', numberOfLines: 1, style: { color: textMuted(), marginTop: 2 } }, s.artist + (s.duration ? ' • ' + s.duration : ''))
+							),
+							h(
+								Tap,
 								{
-									key: s.videoId,
+									onPress: function () {
+										playTrack(s)
+										setTab('now_playing')
+									},
 									style: {
-										flexDirection: 'row',
-										alignItems: 'center',
-										padding: 10,
-										borderRadius: 10,
-										backgroundColor: surfaceTertiary(),
-										marginBottom: 8,
-										gap: 10
+										backgroundColor: ACCENT_COLOR,
+										paddingVertical: 6,
+										paddingHorizontal: 12,
+										borderRadius: 6
 									}
 								},
-								// Thumbnail
-								s.thumbnail
-									? h(RN.Image, {
-										source: { uri: s.thumbnail },
-										style: { width: 44, height: 44, borderRadius: 8, backgroundColor: surface() }
-									})
-									: (MusicIcon ? h(MusicIcon, { size: 'md', color: ACCENT_COLOR }) : null),
-								// Title & Info
-								h(
-									RN.View,
-									{ style: { flex: 1 } },
-									T({ variant: 'text-sm/bold', numberOfLines: 1, style: { color: textNormal() } }, s.title),
-									T({ variant: 'text-xs/medium', numberOfLines: 1, style: { color: textMuted(), marginTop: 2 } }, s.artist + (s.duration ? ' • ' + s.duration : ''))
-								),
-								// Action Buttons: Play Now & Add Queue
-								h(
-									Tap,
-									{
-										onPress: function () {
-											playTrack(s)
-											setTab('now_playing')
-										},
-										style: {
-											backgroundColor: ACCENT_COLOR,
-											paddingVertical: 6,
-											paddingHorizontal: 10,
-											borderRadius: 6
-										}
-									},
-									T({ variant: 'text-xs/bold', style: { color: '#fff' } }, 'Play')
-								),
-								h(
-									Tap,
-									{
-										onPress: function () { addToQueue(s) },
-										style: {
-											backgroundColor: surface(),
-											paddingVertical: 6,
-											paddingHorizontal: 8,
-											borderRadius: 6
-										}
-									},
-									T({ variant: 'text-xs/bold', style: { color: textNormal() } }, '+ Queue')
-								)
+								T({ variant: 'text-xs/bold', style: { color: '#fff' } }, 'Play')
+							),
+							h(
+								Tap,
+								{
+									onPress: function () { addToQueue(s) },
+									style: {
+										backgroundColor: surface(),
+										paddingVertical: 6,
+										paddingHorizontal: 10,
+										borderRadius: 6
+									}
+								},
+								T({ variant: 'text-xs/bold', style: { color: textNormal() } }, '+ Queue')
 							)
-						})
-					)
+						)
+					})
 				) : null,
 
 				// TAB 3: UP NEXT QUEUE & HISTORY
 				currentTab === 'queue' ? h(
 					RN.ScrollView,
-					{ style: { width: '100%', maxHeight: scrollMax - 80 }, showsVerticalScrollIndicator: true },
+					{ style: { width: '100%', maxHeight: scrollMax - 70 }, contentContainerStyle: { paddingBottom: 28 }, showsVerticalScrollIndicator: true },
 					// Header & Clear Queue
 					h(
 						RN.View,
@@ -1553,7 +1551,7 @@
 				// TAB 4: SETTINGS & ABOUT
 				currentTab === 'settings' ? h(
 					RN.ScrollView,
-					{ style: { width: '100%', maxHeight: scrollMax - 80 }, showsVerticalScrollIndicator: true },
+					{ style: { width: '100%', maxHeight: scrollMax - 70 }, contentContainerStyle: { paddingBottom: 28 }, showsVerticalScrollIndicator: true },
 					h(
 						Design.TableRowGroup,
 						{ title: 'Playback Preferences' },
@@ -1593,7 +1591,7 @@
 						h(Design.TableRow, {
 							key: 'abt-1',
 							label: 'YouTube Music for Valenced',
-							subLabel: 'Version 1.0.2 by asaprajx. Stream ad-free music with LRCLIB synchronized lyrics.'
+							subLabel: 'Version 1.0.3 by asaprajx. Stream ad-free music with LRCLIB synchronized lyrics.'
 						})
 					)
 				) : null
@@ -1680,7 +1678,7 @@
 				h(Design.TableRow, {
 					key: 'set-abt',
 					label: 'YouTube Music for Valenced',
-					subLabel: 'Version 1.0.2 by asaprajx. Stream ad-free music with LRCLIB synchronized lyrics.'
+					subLabel: 'Version 1.0.3 by asaprajx. Stream ad-free music with LRCLIB synchronized lyrics.'
 				})
 			)
 		)
