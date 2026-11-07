@@ -147,9 +147,21 @@
 		})
 	}
 
+	function extractText(node) {
+		if (node === null || node === undefined) return ''
+		if (typeof node === 'string' || typeof node === 'number') return String(node)
+		if (Array.isArray(node)) return node.map(extractText).join('')
+		if (typeof node === 'object') {
+			if (node.clean) return String(node.clean)
+			if (node.raw) return String(node.raw)
+			var res = String(node.text || '')
+			if (Array.isArray(node.extra)) res += node.extra.map(extractText).join('')
+			return res
+		}
+		return ''
+	}
 	function cleanMotd(value) {
-		var text = Array.isArray(value) ? value.join('\n') : value && typeof value === 'object' ? value.clean || value.raw || '' : String(value || '')
-		if (Array.isArray(text)) text = text.join('\n')
+		var text = extractText(value)
 		return String(text).replace(/§./g, '').replace(/<[^>]+>/g, '').replace(/&amp;/g, '&').replace(/\n{3,}/g, '\n\n').trim()
 	}
 
@@ -457,6 +469,7 @@
 	}
 
 	/** Checks one server, unless a recent answer is good enough. */
+	var querySeq = {}
 	function check(server, force) {
 		var entry = results[server.id]
 		var fresh = Number(setting('cacheSeconds')) * 1000
@@ -464,8 +477,11 @@
 		if (inflight[server.id]) return inflight[server.id]
 		results[server.id] = { state: 'loading', data: entry && entry.data, at: entry ? entry.at : 0 }
 		changed()
+		var seq = (querySeq[server.id] || 0) + 1
+		querySeq[server.id] = seq
 		inflight[server.id] = query(server).then(
 			function (data) {
+				if (querySeq[server.id] !== seq) return data
 				delete inflight[server.id]
 				results[server.id] = { state: 'done', data: data, at: Date.now() }
 				try {
@@ -475,18 +491,24 @@
 					}
 				} catch (e) {}
 				if (!data.error && !data.online && setting('pingSource') !== 'site' && /^\d{1,3}(\.\d{1,3}){3}$/.test(pingTarget(server, data).host)) {
-					// The sites say offline. If the phone can reach the address, say so: some servers block status sites.
 					data.pingFrom = 'measuring'
 					changed()
 					return measureLocal(server, data).then(
 						function (p) {
+							if (querySeq[server.id] !== seq) return data
 							if (p && !p.unsupported) { data.phoneReachable = true; data.ping = p.ms; data.pingFrom = 'phone'; data.rawPing = p.raw }
 							else data.pingFrom = 'none'
 							try { record(server, data); checkAlerts(server, data) } catch (e) {}
 							changed()
 							return data
 						},
-						function () { data.pingFrom = 'none'; try { record(server, data) } catch (e) {} changed(); return data },
+						function () {
+							if (querySeq[server.id] !== seq) return data
+							data.pingFrom = 'none'
+							try { record(server, data) } catch (e) {}
+							changed()
+							return data
+						},
 					)
 				}
 				var measure = setting('pingSource') !== 'site' && !data.error && data.online
@@ -496,7 +518,6 @@
 					changed()
 					return data
 				}
-				// Show the answer now; the ping from this phone follows a moment later.
 				data.providerPing = data.ping
 				data.ping = null
 				data.pingFrom = 'measuring'
@@ -504,6 +525,7 @@
 				changed()
 				return measureLocal(server, data).then(
 					function (p) {
+						if (querySeq[server.id] !== seq) return data
 						if (p && !p.unsupported) { data.ping = p.ms; data.pingFrom = 'phone'; data.rawPing = p.raw; lastRaw = { raw: p.raw, name: server.name } }
 						else { data.ping = typeof data.providerPing === 'number' ? data.providerPing : null; data.pingFrom = typeof data.providerPing === 'number' ? 'site' : 'none'; if (p && p.unsupported) data.pingNote = 'This phone does not allow the check' }
 						try { record(server, data) } catch (e) {}
@@ -511,6 +533,7 @@
 						return data
 					},
 					function () {
+						if (querySeq[server.id] !== seq) return data
 						data.ping = typeof data.providerPing === 'number' ? data.providerPing : null
 						data.pingFrom = data.ping === null ? 'none' : 'site'
 						try { record(server, data) } catch (e) {}
@@ -520,6 +543,7 @@
 				)
 			},
 			function (e) {
+				if (querySeq[server.id] !== seq) return { error: errorText(e), online: false }
 				delete inflight[server.id]
 				var data = { error: errorText(e), online: false }
 				results[server.id] = { state: 'done', data: data, at: Date.now() }
@@ -1282,7 +1306,6 @@
 			else delete item.IconComponent
 		}
 		status.button = 'added to the + menu'
-		changed()
 		return valenced.react.React.cloneElement(result, { items: items.concat([item]) })
 	}
 
