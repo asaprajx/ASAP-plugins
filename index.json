@@ -123,16 +123,16 @@
       }
     },
     "asaprajx.yt-music": {
-      "name": "YouTube Music",
-      "description": "Stream ad-free music inside Discord with synchronized lyrics, search, queue management, and background playback.",
+      "name": "JioSaavn",
+      "description": "Stream ad-free high quality (320kbps) music inside Discord via JioSaavn with synchronized lyrics, search, queue management, and background playback.",
       "author": "asaprajx (https://github.com/asaprajx \"GitHub\")",
       "contributors": [
-        "YouTube Music & Invidious community",
+        "JioSaavn",
         "LRCLIB (https://lrclib.net \"Lyrics API\")"
       ],
       "icon": "MusicIcon",
       "channels": {
-        "latest": "1.0.5"
+        "latest": "1.0.6"
       },
       "versions": {
         "1.0.0": {
@@ -217,6 +217,47 @@
           "url": "https://raw.githubusercontent.com/asaprajx/ASAP-plugins/gh-pages/pool/asaprajx.yt-music@1.0.5.zip",
           "sha256": "2629dda1c12ac47fefdd21aa0b2e416c64ba49404f5acd86dc4743b40ebd6b3e",
           "size": 14480,
+          "dependencies": {
+            "valenced.api": {
+              "version": ">=1 <2"
+            },
+            "discord": {
+              "version": "*"
+            }
+          }
+        },
+        "1.0.6": {
+          "url": "https://raw.githubusercontent.com/asaprajx/ASAP-plugins/gh-pages/pool/asaprajx.yt-music@1.0.6.zip",
+          "sha256": "80759cfcc523a6a09125059217b643178a2688a05e41a0781d07da469211ce00",
+          "size": 16207,
+          "dependencies": {
+            "valenced.api": {
+              "version": ">=1 <2"
+            },
+            "discord": {
+              "version": "*"
+            }
+          }
+        }
+      }
+    },
+    "asaprajx.jiosaavn": {
+      "name": "JioSaavn",
+      "description": "Stream ad-free high quality (320kbps) music inside Discord via JioSaavn with synchronized lyrics, search, queue management, and background playback.",
+      "author": "asaprajx (https://github.com/asaprajx \"GitHub\")",
+      "contributors": [
+        "JioSaavn",
+        "LRCLIB (https://lrclib.net \"Lyrics API\")"
+      ],
+      "icon": "MusicIcon",
+      "channels": {
+        "latest": "1.0.6"
+      },
+      "versions": {
+        "1.0.6": {
+          "url": "https://raw.githubusercontent.com/asaprajx/ASAP-plugins/gh-pages/pool/asaprajx.jiosaavn@1.0.6.zip",
+          "sha256": "8011f5a017072efc7827c9ca3399a4b6a4d85cf4c4c189b3e1733aff1a3223f6",
+          "size": 16206,
           "dependencies": {
             "valenced.api": {
               "version": ">=1 <2"
