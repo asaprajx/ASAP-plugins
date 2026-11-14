@@ -14,11 +14,11 @@ To add this repository to Valenced:
 4. Tap **Add Repository** and enter:
 
 ```text
-https://asaprajx.github.io/valenced-plugin-template/index.json
+https://raw.githubusercontent.com/asaprajx/ASAP-plugins/gh-pages/index.json
 ```
-*(Or the raw fallback link:)*
+*(Or the GitHub Pages link:)*
 ```text
-https://raw.githubusercontent.com/asaprajx/valenced-plugin-template/gh-pages/index.json
+https://asaprajx.github.io/ASAP-plugins/index.json
 ```
 
 ---
