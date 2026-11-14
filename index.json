@@ -17,7 +17,7 @@
       },
       "versions": {
         "2.0.2": {
-          "url": "https://raw.githubusercontent.com/asaprajx/valenced-plugin-template/gh-pages/pool/asaprajx.minecraft-servers@2.0.2.zip",
+          "url": "https://raw.githubusercontent.com/asaprajx/ASAP-plugins/gh-pages/pool/asaprajx.minecraft-servers@2.0.2.zip",
           "sha256": "3e405304effb75974d05b549f8b283018d5a572c8445b976182d6cd339fb4697",
           "size": 23938,
           "dependencies": {
@@ -30,7 +30,7 @@
           }
         },
         "2.0.3": {
-          "url": "https://raw.githubusercontent.com/asaprajx/valenced-plugin-template/gh-pages/pool/asaprajx.minecraft-servers@2.0.3.zip",
+          "url": "https://raw.githubusercontent.com/asaprajx/ASAP-plugins/gh-pages/pool/asaprajx.minecraft-servers@2.0.3.zip",
           "sha256": "e5123bf0c0766c00c3db65e7c186012d905c5cfd351c8a834306a384bb362871",
           "size": 24019,
           "dependencies": {
@@ -111,112 +111,6 @@
           "url": "https://raw.githubusercontent.com/asaprajx/ASAP-plugins/gh-pages/pool/asaprajx.minecraft-servers@2.0.9.zip",
           "sha256": "d614a4e130a216dc479d075bf25629bd716871c58136f4627350431c54e1c084",
           "size": 23615,
-          "dependencies": {
-            "valenced.api": {
-              "version": ">=1 <2"
-            },
-            "discord": {
-              "version": "*"
-            }
-          }
-        }
-      }
-    },
-    "asaprajx.yt-music": {
-      "name": "YouTube Music",
-      "description": "Stream ad-free music inside Discord with synchronized lyrics, search, queue management, and background playback.",
-      "author": "asaprajx (https://github.com/asaprajx \"GitHub\")",
-      "contributors": [
-        "YouTube Music & Invidious community",
-        "LRCLIB (https://lrclib.net \"Lyrics API\")"
-      ],
-      "icon": "MusicIcon",
-      "channels": {
-        "latest": "1.0.5"
-      },
-      "versions": {
-        "1.0.0": {
-          "url": "https://raw.githubusercontent.com/asaprajx/ASAP-plugins/gh-pages/pool/asaprajx.yt-music@1.0.0.zip",
-          "sha256": "3bc09f0946bd024ff3b1facafb1cf53757ce21fcafe9e2879342325789ef5556",
-          "size": 13533,
-          "dependencies": {
-            "valenced.api": {
-              "version": ">=1 <2"
-            },
-            "discord": {
-              "version": "*"
-            }
-          }
-        },
-        "1.0.1": {
-          "url": "https://raw.githubusercontent.com/asaprajx/ASAP-plugins/gh-pages/pool/asaprajx.yt-music@1.0.1.zip",
-          "sha256": "8b9d70afe73a8e6b1968ae90098e35e3ea15e32a49b49f0e72fd6136c6baa922",
-          "size": 14239,
-          "dependencies": {
-            "valenced.api": {
-              "version": ">=1 <2"
-            },
-            "discord": {
-              "version": "*"
-            }
-          }
-        },
-        "1.0.12": {
-          "url": "https://raw.githubusercontent.com/asaprajx/ASAP-plugins/gh-pages/pool/asaprajx.yt-music@1.0.12.zip",
-          "sha256": "ed70b178b545b7f6c70c597873702d4d86959c6763803c67f8c8905e753e1b48",
-          "size": 14116,
-          "dependencies": {
-            "valenced.api": {
-              "version": ">=1 <2"
-            },
-            "discord": {
-              "version": "*"
-            }
-          }
-        },
-        "1.0.2": {
-          "url": "https://raw.githubusercontent.com/asaprajx/ASAP-plugins/gh-pages/pool/asaprajx.yt-music@1.0.2.zip",
-          "sha256": "f12e2676a8a941bf17f7eff3f4b5d852908ab39a69e7d1d7c5876e2066e63166",
-          "size": 14115,
-          "dependencies": {
-            "valenced.api": {
-              "version": ">=1 <2"
-            },
-            "discord": {
-              "version": "*"
-            }
-          }
-        },
-        "1.0.3": {
-          "url": "https://raw.githubusercontent.com/asaprajx/ASAP-plugins/gh-pages/pool/asaprajx.yt-music@1.0.3.zip",
-          "sha256": "b7029528e01243ad88bf8cb4efe3c8f2325de25f87fcf1ce7522c3b45af73dc8",
-          "size": 14133,
-          "dependencies": {
-            "valenced.api": {
-              "version": ">=1 <2"
-            },
-            "discord": {
-              "version": "*"
-            }
-          }
-        },
-        "1.0.4": {
-          "url": "https://raw.githubusercontent.com/asaprajx/ASAP-plugins/gh-pages/pool/asaprajx.yt-music@1.0.4.zip",
-          "sha256": "b052394339b2aea9583749dc44adad4312fdf20307ab50b6e73454bd1afd96d9",
-          "size": 14312,
-          "dependencies": {
-            "valenced.api": {
-              "version": ">=1 <2"
-            },
-            "discord": {
-              "version": "*"
-            }
-          }
-        },
-        "1.0.5": {
-          "url": "https://raw.githubusercontent.com/asaprajx/ASAP-plugins/gh-pages/pool/asaprajx.yt-music@1.0.5.zip",
-          "sha256": "2629dda1c12ac47fefdd21aa0b2e416c64ba49404f5acd86dc4743b40ebd6b3e",
-          "size": 14480,
           "dependencies": {
             "valenced.api": {
               "version": ">=1 <2"
