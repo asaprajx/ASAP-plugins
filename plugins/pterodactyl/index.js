@@ -1,12 +1,13 @@
 (function (exports) {
 	/*
 	 * Pterodactyl Server Controller for Valenced Discord Mobile.
-	 * Monitor live CPU/RAM/Disk, send console commands, browse server files, and trigger power actions.
+	 * Monitor live CPU/RAM/Disk, send console commands, browse server files, trigger power actions, and manage players.
 	 * Keep `(function` as the first thing in this file: Valenced loads it as `return <file>`.
 	 */
 	var PLUGIN_ID = 'asaprajx.pterodactyl'
 	var SHEET_KEY = 'asaprajx.pterodactyl.panel'
 	var VIEWER_SHEET_KEY = 'asaprajx.pterodactyl.fileviewer'
+	var PLAYER_SHEET_KEY = 'asaprajx.pterodactyl.playeractions'
 	var TOAST_ID = 'ASAP_PTERODACTYL'
 
 	var GREEN = '#23a55a'
@@ -19,7 +20,8 @@
 		panelUrl: 'https://panel.altare.global',
 		apiKey: '',
 		defaultServerId: 'ed321e1e',
-		autoRefresh: 15
+		autoRefresh: 15,
+		serverAliases: {}
 	}
 
 	var storage
@@ -29,6 +31,7 @@
 	var state = {
 		servers: [],
 		selectedServerId: 'ed321e1e',
+		serverDetails: {},
 		serverStats: null,
 		loadingStats: false,
 		lastError: '',
@@ -38,7 +41,18 @@
 		logs: '',
 		logLines: [],
 		loadingLogs: false,
-		history: []
+		history: [],
+		// Players state
+		onlinePlayers: [],
+		onlinePlayerCount: 0,
+		maxPlayerCount: 20,
+		serverMotd: '',
+		serverFavicon: null,
+		knownPlayers: [],
+		opsList: [],
+		whitelist: [],
+		loadingPlayers: false,
+		statusProvider: ''
 	}
 
 	function finders() { return valenced.modules.finders }
@@ -107,6 +121,27 @@
 				}
 			}
 		} catch (e) {}
+	}
+
+	function getServerDisplayName(server) {
+		if (!server) return 'Pterodactyl Server'
+		var aliases = setting('serverAliases') || {}
+		return aliases[server.id] || server.name || 'Pterodactyl Server'
+	}
+
+	function setServerAlias(serverId, newName) {
+		var id = serverId || getActiveServerId()
+		var aliases = Object.assign({}, setting('serverAliases') || {})
+		var trimmed = String(newName || '').trim()
+		if (trimmed) {
+			aliases[id] = trimmed
+			toast('Server renamed to "' + trimmed + '" (local only)')
+		} else {
+			delete aliases[id]
+			toast('Server name reset to default')
+		}
+		saveSetting({ serverAliases: aliases })
+		changed()
 	}
 
 	function changed() {
@@ -294,12 +329,43 @@
 				state.selectedServerId = state.servers[0].id
 			}
 			changed()
+			fetchServerDetails(state.selectedServerId)
 			return state.servers
 		}).catch(function (err) {
 			state.lastError = errorText(err)
 			changed()
 			throw err
 		})
+	}
+
+	function fetchServerDetails(serverId) {
+		var id = serverId || getActiveServerId()
+		if (!id) return Promise.resolve(null)
+		return apiRequest('/api/client/servers/' + id).then(function (res) {
+			var attr = (res && res.attributes) || {}
+			var rel = (attr.relationships && attr.relationships.allocations && attr.relationships.allocations.data) || []
+			var host = null
+			var port = null
+			for (var i = 0; i < rel.length; i++) {
+				var a = rel[i].attributes || {}
+				if (a.is_default || !host) {
+					host = a.ip_alias || a.ip
+					port = a.port
+				}
+			}
+			if (!host && attr.sftp_details) {
+				host = attr.sftp_details.ip
+				port = 25565
+			}
+			state.serverDetails[id] = {
+				id: id,
+				name: attr.name,
+				host: host || 'in-mum01.altare.global',
+				port: port || 25297
+			}
+			changed()
+			return state.serverDetails[id]
+		}).catch(function () {})
 	}
 
 	function fetchResources(serverId) {
@@ -399,6 +465,188 @@
 		}).catch(function (err) {
 			state.loadingLogs = false
 			state.logs = 'Failed to load logs/latest.log: ' + errorText(err)
+			changed()
+		})
+	}
+
+	// ======================================================================================
+	// Multi-Service Status Engine (Avoids Pterodactyl API Rate Limits)
+	// ======================================================================================
+	function queryStatusTimeout(url, ms) {
+		return new Promise(function (resolve, reject) {
+			var timer = setTimeout(function () { reject(new Error('Timeout')) }, ms || 4000)
+			fetch(url, { headers: { 'User-Agent': 'ValencedPterodactyl/1.0' } })
+				.then(function (res) {
+					clearTimeout(timer)
+					if (!res.ok) throw new Error('HTTP ' + res.status)
+					return res.json()
+				})
+				.then(function (data) {
+					clearTimeout(timer)
+					resolve(data)
+				})
+				.catch(function (err) {
+					clearTimeout(timer)
+					reject(err)
+				})
+		})
+	}
+
+	function queryMinecraftStatus(host, port) {
+		var target = encodeURIComponent(host + ':' + (port || 25565))
+		var cleanHost = encodeURIComponent(host)
+		var cleanPort = encodeURIComponent(port || 25565)
+
+		// 1. mcstatus.io (Primary)
+		var tryMcstatus = function () {
+			return queryStatusTimeout('https://api.mcstatus.io/v2/status/java/' + target, 3500).then(function (data) {
+				if (!data || !data.online) throw new Error('Offline or invalid data')
+				var pInfo = data.players || {}
+				var list = (pInfo.list && Array.isArray(pInfo.list)) ? pInfo.list.map(function (p) {
+					return { name: p.name_clean || p.name_raw || p.name || 'Player', uuid: p.uuid || '' }
+				}) : []
+				return {
+					provider: 'mcstatus.io',
+					online: true,
+					playerCount: Number(pInfo.online) || 0,
+					maxPlayers: Number(pInfo.max) || 20,
+					players: list,
+					motd: data.motd && data.motd.clean ? data.motd.clean : '',
+					icon: data.icon || null
+				}
+			})
+		}
+
+		// 2. mcsrvstat.us (1st Fallback)
+		var tryMcsrvstat = function () {
+			return queryStatusTimeout('https://api.mcsrvstat.us/3/' + target, 3500).then(function (data) {
+				if (!data || !data.online) throw new Error('Offline or invalid data')
+				var pInfo = data.players || {}
+				var list = []
+				if (pInfo.list && Array.isArray(pInfo.list)) {
+					list = pInfo.list.map(function (p) {
+						if (typeof p === 'string') return { name: p, uuid: '' }
+						return { name: p.name || 'Player', uuid: p.uuid || '' }
+					})
+				}
+				return {
+					provider: 'mcsrvstat.us',
+					online: true,
+					playerCount: Number(pInfo.online) || 0,
+					maxPlayers: Number(pInfo.max) || 20,
+					players: list,
+					motd: data.motd && data.motd.clean && data.motd.clean.length ? data.motd.clean.join('\n') : '',
+					icon: data.icon || null
+				}
+			})
+		}
+
+		// 3. minetools.eu (2nd Fallback)
+		var tryMinetools = function () {
+			return queryStatusTimeout('https://api.minetools.eu/ping/' + cleanHost + '/' + cleanPort, 3500).then(function (data) {
+				if (!data || data.error) throw new Error('Offline or invalid data')
+				var pInfo = data.players || {}
+				var list = []
+				if (pInfo.sample && Array.isArray(pInfo.sample)) {
+					list = pInfo.sample.map(function (p) {
+						return { name: p.name || 'Player', uuid: p.id || '' }
+					})
+				}
+				return {
+					provider: 'minetools.eu',
+					online: true,
+					playerCount: Number(pInfo.online) || 0,
+					maxPlayers: Number(pInfo.max) || 20,
+					players: list,
+					motd: data.description || '',
+					icon: data.favicon || null
+				}
+			})
+		}
+
+		return tryMcstatus().catch(function () {
+			return tryMcsrvstat().catch(function () {
+				return tryMinetools()
+			})
+		})
+	}
+
+	function fetchPlayers(serverId) {
+		var id = serverId || getActiveServerId()
+		if (!id) return Promise.reject(new Error('No server selected'))
+		state.loadingPlayers = true
+		changed()
+
+		var details = state.serverDetails[id] || {}
+		var host = details.host || 'in-mum01.altare.global'
+		var port = details.port || 25297
+
+		// 1. Read registered players from usercache.json
+		var usercachePromise = readFile(id, 'usercache.json').then(function (content) {
+			try {
+				var parsed = typeof content === 'string' ? JSON.parse(content) : content
+				if (Array.isArray(parsed)) {
+					state.knownPlayers = parsed.map(function (p) {
+						return {
+							name: p.name || 'Player',
+							uuid: p.uuid || ''
+						}
+					})
+				}
+			} catch (e) {
+				state.knownPlayers = []
+			}
+		}).catch(function () {
+			state.knownPlayers = []
+		})
+
+		// 2. Read operators from ops.json
+		var opsPromise = readFile(id, 'ops.json').then(function (content) {
+			try {
+				var parsed = typeof content === 'string' ? JSON.parse(content) : content
+				if (Array.isArray(parsed)) {
+					state.opsList = parsed.map(function (o) { return String(o.name || '').toLowerCase() })
+				}
+			} catch (e) {
+				state.opsList = []
+			}
+		}).catch(function () {
+			state.opsList = []
+		})
+
+		// 3. Read whitelist from whitelist.json
+		var whitelistPromise = readFile(id, 'whitelist.json').then(function (content) {
+			try {
+				var parsed = typeof content === 'string' ? JSON.parse(content) : content
+				if (Array.isArray(parsed)) {
+					state.whitelist = parsed.map(function (w) { return String(w.name || '').toLowerCase() })
+				}
+			} catch (e) {
+				state.whitelist = []
+			}
+		}).catch(function () {
+			state.whitelist = []
+		})
+
+		// 4. Query Minecraft Status via external providers (Zero API Key Rate-Limit)
+		var statusPromise = queryMinecraftStatus(host, port).then(function (res) {
+			state.statusProvider = res.provider
+			state.onlinePlayerCount = res.playerCount
+			state.maxPlayerCount = res.maxPlayers
+			state.onlinePlayers = res.players
+			if (res.icon) state.serverFavicon = res.icon
+			if (res.motd) state.serverMotd = res.motd
+		}).catch(function () {
+			state.statusProvider = 'none'
+			state.onlinePlayerCount = 0
+			state.onlinePlayers = []
+		})
+
+		return Promise.all([usercachePromise, opsPromise, whitelistPromise, statusPromise]).then(function () {
+			state.loadingPlayers = false
+			changed()
+		}).catch(function () {
+			state.loadingPlayers = false
 			changed()
 		})
 	}
@@ -512,6 +760,17 @@
 		var setLogOrder = logOrderState[1]
 		var logScrollRef = React.useRef(null)
 
+		// Inline Server Rename editing state
+		var editingNameState = React.useState(false)
+		var isEditingName = editingNameState[0]
+		var setIsEditingName = editingNameState[1]
+		var newNameInputRef = React.useRef('')
+
+		// Selected player for Player Actions view (Sub-view inside Players Tab)
+		var selectedPlayerState = React.useState(null)
+		var selectedPlayer = selectedPlayerState[0]
+		var setSelectedPlayer = selectedPlayerState[1]
+
 		// Hook listener for background state updates
 		React.useEffect(function () {
 			clearCookies()
@@ -524,6 +783,7 @@
 			if (getApiKey()) {
 				fetchServers().then(function () {
 					fetchResources(id)
+					fetchServerDetails(id)
 				}).catch(function () {})
 			}
 
@@ -553,6 +813,7 @@
 
 		var currentServerId = getActiveServerId()
 		var selectedServer = state.servers.find(function (s) { return s.id === currentServerId }) || { name: 'Pterodactyl Server', id: currentServerId }
+		var serverDisplayName = getServerDisplayName(selectedServer)
 		var stats = state.serverStats || {}
 		var res = stats.resources || {}
 		var currentState = stats.current_state || 'unknown'
@@ -566,6 +827,7 @@
 		function renderTabs() {
 			var tabs = [
 				{ id: 'status', label: 'Status' },
+				{ id: 'players', label: 'Players' },
 				{ id: 'console', label: 'Console' },
 				{ id: 'files', label: 'Files' },
 				{ id: 'settings', label: 'Config' }
@@ -587,29 +849,50 @@
 								if (tab.id === 'console' && !state.logs) {
 									fetchLogs(currentServerId)
 								}
+								if (tab.id === 'players') {
+									setSelectedPlayer(null)
+									fetchPlayers(currentServerId)
+								}
 							},
 							style: {
 								flex: 1,
-								marginHorizontal: 3,
+								marginHorizontal: 2,
 								paddingVertical: 10,
 								borderRadius: 18,
 								alignItems: 'center',
 								backgroundColor: isActive ? BLURPLE : '#2b2d31'
 							}
 						},
-						T({ variant: 'text-sm/bold', style: { color: isActive ? '#ffffff' : '#b5bac1' } }, tab.label)
+						T({ variant: 'text-xs/bold', style: { color: isActive ? '#ffffff' : '#b5bac1' } }, tab.label)
 					)
 				})
 			)
 		}
 
-		// TAB 1: STATUS & POWER
+		// TAB 1: STATUS & POWER (With Server Icon & Rename support)
 		function renderStatusTab() {
 			var cpuPercent = (res.cpu_absolute != null ? res.cpu_absolute.toFixed(1) : '0') + '%'
 			var memStr = formatBytes(res.memory_bytes)
 			var memLimit = (selectedServer.limits && selectedServer.limits.memory ? selectedServer.limits.memory + ' MB' : 'Unlimited')
 			var diskStr = formatBytes(res.disk_bytes)
 			var diskLimit = (selectedServer.limits && selectedServer.limits.disk ? selectedServer.limits.disk + ' MB' : 'Unlimited')
+
+			var details = state.serverDetails[currentServerId] || {}
+			var hostPort = details.host ? details.host + ':' + (details.port || 25297) : (selectedServer.node ? selectedServer.node : '')
+
+			var serverAssetId = valenced.assets.getAssetIdByName('ServerIcon') || valenced.assets.getAssetIdByName('GameControllerIcon')
+			var faviconUri = state.serverFavicon
+
+			// Server Icon box
+			var iconElem = faviconUri
+				? h(RN.Image, { source: { uri: faviconUri }, style: { width: 44, height: 44, borderRadius: 10, marginRight: 10 } })
+				: h(
+					RN.View,
+					{ style: { width: 44, height: 44, borderRadius: 10, backgroundColor: BLURPLE, justifyContent: 'center', alignItems: 'center', marginRight: 10 } },
+					serverAssetId
+						? h(RN.Image, { source: serverAssetId, style: { width: 24, height: 24, tintColor: '#ffffff' } })
+						: T({ variant: 'heading-md/bold', style: { color: '#ffffff' } }, '🎮')
+				)
 
 			return h(
 				RN.View,
@@ -620,12 +903,31 @@
 					{ style: { backgroundColor: '#1e1f22', borderRadius: 12, padding: 14, marginBottom: 14 } },
 					h(
 						RN.View,
-						{ style: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' } },
+						{ style: { flexDirection: 'row', alignItems: 'center' } },
+						iconElem,
 						h(
 							RN.View,
 							{ style: { flex: 1, marginRight: 8 } },
-							T({ variant: 'heading-md/bold', style: { color: '#f2f3f5' } }, selectedServer.name),
-							T({ variant: 'text-xs/medium', style: { color: '#949ba4' } }, 'ID: ' + selectedServer.id + (selectedServer.node ? ' | ' + selectedServer.node : ''))
+							h(
+								RN.View,
+								{ style: { flexDirection: 'row', alignItems: 'center' } },
+								T({ variant: 'heading-md/bold', style: { color: '#f2f3f5', marginRight: 6 } }, serverDisplayName),
+								h(
+									RN.TouchableOpacity,
+									{
+										onPress: function () {
+											newNameInputRef.current = serverDisplayName
+											setIsEditingName(!isEditingName)
+										},
+										style: { padding: 4 }
+									},
+									T({ variant: 'text-xs/bold', style: { color: BLURPLE } }, '✏️')
+								)
+							),
+							serverDisplayName !== selectedServer.name
+								? T({ variant: 'text-xs/medium', style: { color: '#949ba4' } }, 'Panel: ' + selectedServer.name)
+								: null,
+							T({ variant: 'text-xs/medium', style: { color: '#949ba4' } }, 'ID: ' + selectedServer.id + (hostPort ? ' | ' + hostPort : ''))
 						),
 						h(
 							RN.View,
@@ -633,6 +935,47 @@
 							T({ variant: 'text-xs/bold', style: { color: '#ffffff' } }, currentState.toUpperCase())
 						)
 					),
+					// Inline Rename Field (If toggled)
+					isEditingName ? h(
+						RN.View,
+						{ style: { marginTop: 12, padding: 10, backgroundColor: '#2b2d31', borderRadius: 8 } },
+						T({ variant: 'text-xs/semibold', style: { color: '#dbdee1', marginBottom: 4 } }, 'Rename Server (Inside Plugin Only):'),
+						h(
+							RN.View,
+							{ style: { flexDirection: 'row', alignItems: 'center' } },
+							h(
+								RN.View,
+								{ style: { flex: 1, marginRight: 6 } },
+								h(D.TextInput, {
+									defaultValue: serverDisplayName,
+									placeholder: selectedServer.name,
+									onChange: function (v) { newNameInputRef.current = v }
+								})
+							),
+							h(
+								RN.TouchableOpacity,
+								{
+									onPress: function () {
+										setServerAlias(currentServerId, newNameInputRef.current)
+										setIsEditingName(false)
+									},
+									style: { backgroundColor: GREEN, paddingHorizontal: 12, paddingVertical: 10, borderRadius: 6, marginRight: 4 }
+								},
+								T({ variant: 'text-xs/bold', style: { color: '#ffffff' } }, 'Save')
+							),
+							serverDisplayName !== selectedServer.name ? h(
+								RN.TouchableOpacity,
+								{
+									onPress: function () {
+										setServerAlias(currentServerId, '')
+										setIsEditingName(false)
+									},
+									style: { backgroundColor: '#383a40', paddingHorizontal: 8, paddingVertical: 10, borderRadius: 6 }
+								},
+								T({ variant: 'text-xs/medium', style: { color: '#dbdee1' } }, 'Reset')
+							) : null
+						)
+					) : null,
 					h(RN.View, { style: { height: 1, backgroundColor: '#2b2d31', marginVertical: 12 } }),
 					// Metrics Row
 					h(
@@ -693,7 +1036,289 @@
 			)
 		}
 
-		// TAB 2: CONSOLE & COMMANDS (Direct non-nested scroll for silky smooth terminal interaction)
+		// TAB 2 SUBVIEW: PLAYER ACTIONS (Rendered right inside the full-height sheet body)
+		function renderPlayerDetailView(p, goBack) {
+			var pName = p.name || 'Player'
+			var pLower = pName.toLowerCase()
+			var isOp = state.opsList.indexOf(pLower) !== -1
+			var isWl = state.whitelist.indexOf(pLower) !== -1
+			var headUrl = 'https://mc-heads.net/avatar/' + encodeURIComponent(pName) + '/48'
+
+			function runCmd(cmd, label) {
+				sendCommand(currentServerId, cmd)
+				toast(label + ' for ' + pName)
+				goBack()
+				setTimeout(function () { fetchPlayers(currentServerId) }, 1500)
+			}
+
+			return h(
+				RN.View,
+				{ style: { paddingHorizontal: 10 } },
+				// Back Button
+				h(
+					RN.TouchableOpacity,
+					{
+						onPress: goBack,
+						style: { flexDirection: 'row', alignItems: 'center', marginBottom: 12, paddingVertical: 6 }
+					},
+					T({ variant: 'text-sm/bold', style: { color: BLURPLE } }, '‹ Back to All Players')
+				),
+				// Player Card
+				h(
+					RN.View,
+					{ style: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#1e1f22', padding: 14, borderRadius: 12, marginBottom: 16 } },
+					h(RN.Image, { source: { uri: headUrl }, style: { width: 48, height: 48, borderRadius: 10, marginRight: 12 } }),
+					h(
+						RN.View,
+						{ style: { flex: 1 } },
+						T({ variant: 'heading-md/bold', style: { color: '#ffffff' } }, pName),
+						h(
+							RN.View,
+							{ style: { flexDirection: 'row', alignItems: 'center', marginTop: 4 } },
+							isOp ? h(
+								RN.View,
+								{ style: { backgroundColor: AMBER, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6, marginRight: 6 } },
+								T({ variant: 'text-xs/bold', style: { color: '#111214' } }, '👑 OPERATOR')
+							) : null,
+							isWl ? h(
+								RN.View,
+								{ style: { backgroundColor: GREEN, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6, marginRight: 6 } },
+								T({ variant: 'text-xs/bold', style: { color: '#ffffff' } }, '✅ WHITELISTED')
+							) : null,
+							!isOp && !isWl ? T({ variant: 'text-xs/medium', style: { color: '#949ba4' } }, 'Regular Player') : null
+						),
+						p.uuid ? h(
+							RN.TouchableOpacity,
+							{ onPress: function () { copyText(p.uuid, 'Player UUID') }, style: { marginTop: 4 } },
+							T({ variant: 'text-xs/medium', style: { color: '#949ba4' } }, 'UUID: ' + p.uuid.slice(0, 18) + '... ⧉')
+						) : null
+					)
+				),
+				// 1. Operator Controls
+				T({ variant: 'eyebrow', style: { color: '#949ba4', marginBottom: 6 } }, 'OPERATOR PRIVILEGES'),
+				!isOp ? h(
+					RN.TouchableOpacity,
+					{
+						onPress: function () { runCmd('op ' + pName, 'Granted OP') },
+						style: { backgroundColor: GREEN, paddingVertical: 12, paddingHorizontal: 14, borderRadius: 8, alignItems: 'center', marginBottom: 14 }
+					},
+					T({ variant: 'text-sm/bold', style: { color: '#ffffff' } }, '👑 Make Operator (/op ' + pName + ')')
+				) : h(
+					RN.TouchableOpacity,
+					{
+						onPress: function () { runCmd('deop ' + pName, 'Removed OP') },
+						style: { backgroundColor: RED, paddingVertical: 12, paddingHorizontal: 14, borderRadius: 8, alignItems: 'center', marginBottom: 14 }
+					},
+					T({ variant: 'text-sm/bold', style: { color: '#ffffff' } }, '🛑 Remove Operator (/deop ' + pName + ')')
+				),
+				// 2. Whitelist Controls
+				T({ variant: 'eyebrow', style: { color: '#949ba4', marginBottom: 6 } }, 'WHITELIST MANAGEMENT'),
+				!isWl ? h(
+					RN.TouchableOpacity,
+					{
+						onPress: function () { runCmd('whitelist add ' + pName, 'Whitelisted') },
+						style: { backgroundColor: BLURPLE, paddingVertical: 12, paddingHorizontal: 14, borderRadius: 8, alignItems: 'center', marginBottom: 14 }
+					},
+					T({ variant: 'text-sm/bold', style: { color: '#ffffff' } }, '✅ Add to Whitelist (/whitelist add)')
+				) : h(
+					RN.TouchableOpacity,
+					{
+						onPress: function () { runCmd('whitelist remove ' + pName, 'Removed from whitelist') },
+						style: { backgroundColor: AMBER, paddingVertical: 12, paddingHorizontal: 14, borderRadius: 8, alignItems: 'center', marginBottom: 14 }
+					},
+					T({ variant: 'text-sm/bold', style: { color: '#111214' } }, '❌ Remove from Whitelist (/whitelist remove)')
+				),
+				// 3. Moderation Controls
+				T({ variant: 'eyebrow', style: { color: '#949ba4', marginBottom: 6 } }, 'MODERATION ACTIONS'),
+				h(
+					RN.View,
+					{ style: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 14 } },
+					h(
+						RN.TouchableOpacity,
+						{
+							onPress: function () { runCmd('kick ' + pName, 'Kicked') },
+							style: { flex: 1, backgroundColor: RED, paddingVertical: 12, borderRadius: 8, alignItems: 'center', marginHorizontal: 2 }
+						},
+						T({ variant: 'text-sm/bold', style: { color: '#ffffff' } }, '👢 Kick')
+					),
+					h(
+						RN.TouchableOpacity,
+						{
+							onPress: function () { runCmd('ban ' + pName, 'Banned') },
+							style: { flex: 1, backgroundColor: '#800000', paddingVertical: 12, borderRadius: 8, alignItems: 'center', marginHorizontal: 2 }
+						},
+						T({ variant: 'text-sm/bold', style: { color: '#ffffff' } }, '🔨 Ban')
+					),
+					h(
+						RN.TouchableOpacity,
+						{
+							onPress: function () { runCmd('pardon ' + pName, 'Unbanned') },
+							style: { flex: 1, backgroundColor: '#2b2d31', paddingVertical: 12, borderRadius: 8, alignItems: 'center', marginHorizontal: 2 }
+						},
+						T({ variant: 'text-sm/bold', style: { color: '#dbdee1' } }, '🔓 Unban')
+					)
+				),
+				// 4. In-Game Interactions
+				T({ variant: 'eyebrow', style: { color: '#949ba4', marginBottom: 6 } }, 'IN-GAME INTERACTIONS'),
+				h(
+					RN.View,
+					{ style: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 20 } },
+					h(
+						RN.TouchableOpacity,
+						{
+							onPress: function () { runCmd('tp ' + pName + ' 0 80 0', 'Teleported') },
+							style: { flex: 1, backgroundColor: '#2b2d31', paddingVertical: 10, borderRadius: 8, alignItems: 'center', marginHorizontal: 2 }
+						},
+						T({ variant: 'text-xs/bold', style: { color: '#dbdee1' } }, '📍 Spawn TP')
+					),
+					h(
+						RN.TouchableOpacity,
+						{
+							onPress: function () { runCmd('gamemode survival ' + pName, 'Gamemode Survival') },
+							style: { flex: 1, backgroundColor: '#2b2d31', paddingVertical: 10, borderRadius: 8, alignItems: 'center', marginHorizontal: 2 }
+						},
+						T({ variant: 'text-xs/bold', style: { color: '#dbdee1' } }, '🎮 Survival')
+					),
+					h(
+						RN.TouchableOpacity,
+						{
+							onPress: function () { runCmd('gamemode creative ' + pName, 'Gamemode Creative') },
+							style: { flex: 1, backgroundColor: '#2b2d31', paddingVertical: 10, borderRadius: 8, alignItems: 'center', marginHorizontal: 2 }
+						},
+						T({ variant: 'text-xs/bold', style: { color: '#dbdee1' } }, '✨ Creative')
+					)
+				)
+			)
+		}
+
+		// TAB 2: PLAYERS TAB (Clean Player Entries + ⚙️ Gear Action Sheets)
+		function renderPlayersTab() {
+			if (selectedPlayer) {
+				return renderPlayerDetailView(selectedPlayer, function () { setSelectedPlayer(null) })
+			}
+
+			var details = state.serverDetails[currentServerId] || {}
+			var address = (details.host || 'in-mum01.altare.global') + ':' + (details.port || 25297)
+			var gearAsset = valenced.assets.getAssetIdByName('SettingsIcon') || valenced.assets.getAssetIdByName('GearIcon')
+
+			return h(
+				RN.View,
+				{ style: { paddingHorizontal: 10 } },
+				// Header Card
+				h(
+					RN.View,
+					{ style: { backgroundColor: '#1e1f22', borderRadius: 12, padding: 14, marginBottom: 12 } },
+					h(
+						RN.View,
+						{ style: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' } },
+						h(
+							RN.View,
+							null,
+							T({ variant: 'eyebrow', style: { color: '#949ba4' } }, 'MINECRAFT PLAYERS'),
+							T({ variant: 'heading-md/bold', style: { color: '#ffffff', marginTop: 2 } }, currentState === 'running' ? state.onlinePlayerCount + ' / ' + state.maxPlayerCount + ' Online' : 'Server is ' + currentState.toUpperCase()),
+							state.statusProvider && state.statusProvider !== 'none'
+								? T({ variant: 'text-xs/medium', style: { color: '#949ba4', marginTop: 2 } }, 'Via ' + state.statusProvider + ' (External Ping)')
+								: null
+						),
+						h(
+							RN.TouchableOpacity,
+							{
+								onPress: function () { fetchPlayers(currentServerId) },
+								style: { backgroundColor: '#2b2d31', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 8 }
+							},
+							T({ variant: 'text-xs/bold', style: { color: BLURPLE } }, state.loadingPlayers ? 'Checking…' : '⟳ Refresh')
+						)
+					),
+					h(
+						RN.View,
+						{ style: { flexDirection: 'row', alignItems: 'center', marginTop: 8 } },
+						h(
+							RN.TouchableOpacity,
+							{ onPress: function () { copyText(address, 'Server address') } },
+							T({ variant: 'text-xs/medium', style: { color: '#949ba4' } }, 'Address: ' + address + '  ⧉')
+						)
+					)
+				),
+				// Online Players Section
+				T({ variant: 'eyebrow', style: { color: '#949ba4', marginBottom: 8 } }, 'CURRENTLY ONLINE PLAYERS'),
+				state.onlinePlayers.length === 0 ? h(
+					RN.View,
+					{ style: { backgroundColor: '#1e1f22', borderRadius: 8, padding: 14, marginBottom: 14, alignItems: 'center' } },
+					T({ variant: 'text-sm/medium', style: { color: '#949ba4' } }, currentState === 'running' ? 'No players are currently online' : 'Server is offline')
+				) : h(
+					D.TableRowGroup,
+					{ style: { marginBottom: 14 } },
+					state.onlinePlayers.map(function (p) {
+						var pName = p.name || 'Player'
+						var pLower = pName.toLowerCase()
+						var isOp = state.opsList.indexOf(pLower) !== -1
+						var isWl = state.whitelist.indexOf(pLower) !== -1
+						var headUrl = 'https://mc-heads.net/avatar/' + encodeURIComponent(pName) + '/40'
+						return h(
+							D.TableRow,
+							{
+								key: pName,
+								icon: h(RN.Image, { source: { uri: headUrl }, style: { width: 34, height: 34, borderRadius: 6 } }),
+								label: pName,
+								subLabel: (isOp ? '👑 Operator • ' : '') + (isWl ? '✅ Whitelisted • ' : '') + 'Online',
+								trailing: h(
+									RN.TouchableOpacity,
+									{
+										onPress: function () {
+											setSelectedPlayer({ name: pName, uuid: p.uuid, isOp: isOp, isWhitelisted: isWl })
+										},
+										style: { backgroundColor: '#2b2d31', padding: 8, borderRadius: 8, alignItems: 'center', justifyContent: 'center' }
+									},
+									gearAsset
+										? h(RN.Image, { source: gearAsset, style: { width: 18, height: 18, tintColor: '#dbdee1' } })
+										: T({ variant: 'text-sm/bold', style: { color: '#dbdee1' } }, '⚙️')
+								)
+							}
+						)
+					})
+				),
+				// Registered Server Players (usercache.json)
+				T({ variant: 'eyebrow', style: { color: '#949ba4', marginBottom: 8 } }, 'REGISTERED PLAYERS (' + state.knownPlayers.length + ')'),
+				state.knownPlayers.length === 0 ? h(
+					RN.View,
+					{ style: { backgroundColor: '#1e1f22', borderRadius: 8, padding: 14, marginBottom: 14, alignItems: 'center' } },
+					T({ variant: 'text-sm/medium', style: { color: '#949ba4' } }, 'No player history cached yet in usercache.json')
+				) : h(
+					D.TableRowGroup,
+					null,
+					state.knownPlayers.map(function (kp) {
+						var kpName = kp.name || 'Player'
+						var kpLower = kpName.toLowerCase()
+						var isOp = state.opsList.indexOf(kpLower) !== -1
+						var isWl = state.whitelist.indexOf(kpLower) !== -1
+						var headUrl = 'https://mc-heads.net/avatar/' + encodeURIComponent(kpName) + '/40'
+						return h(
+							D.TableRow,
+							{
+								key: kpName + '_' + kp.uuid,
+								icon: h(RN.Image, { source: { uri: headUrl }, style: { width: 34, height: 34, borderRadius: 6 } }),
+								label: kpName,
+								subLabel: (isOp ? '👑 Operator • ' : '') + (isWl ? '✅ Whitelisted • ' : '') + 'Registered User',
+								trailing: h(
+									RN.TouchableOpacity,
+									{
+										onPress: function () {
+											setSelectedPlayer({ name: kpName, uuid: kp.uuid, isOp: isOp, isWhitelisted: isWl })
+										},
+										style: { backgroundColor: '#2b2d31', padding: 8, borderRadius: 8, alignItems: 'center', justifyContent: 'center' }
+									},
+									gearAsset
+										? h(RN.Image, { source: gearAsset, style: { width: 18, height: 18, tintColor: '#dbdee1' } })
+										: T({ variant: 'text-sm/bold', style: { color: '#dbdee1' } }, '⚙️')
+								)
+							}
+						)
+					})
+				)
+			)
+		}
+
+		// TAB 3: CONSOLE & COMMANDS (Direct non-nested scroll for silky smooth terminal interaction)
 		function renderConsoleTab() {
 			var presets = ['/list', '/tps', '/whitelist list', '/say Hello!', '/save-all']
 
@@ -818,7 +1443,7 @@
 			)
 		}
 
-		// TAB 3: FILE EXPLORER
+		// TAB 4: FILE EXPLORER
 		function renderFilesTab() {
 			return h(
 				RN.View,
@@ -878,13 +1503,48 @@
 			)
 		}
 
-		// TAB 4: SETTINGS & CONFIG
+		// TAB 5: SETTINGS & CONFIG
 		var urlInputRef = React.useRef(getPanelUrl())
 		var keyInputRef = React.useRef(getApiKey())
+		var aliasInputRef = React.useRef(serverDisplayName)
 		function renderSettingsTab() {
 			return h(
 				RN.View,
 				{ style: { paddingHorizontal: 10 } },
+				h(
+					D.TableRowGroup,
+					{ title: 'Server Custom Nickname (Local Only)' },
+					h(
+						RN.View,
+						{ style: { padding: 10 } },
+						T({ variant: 'text-xs/medium', style: { color: '#949ba4', marginBottom: 4 } }, 'Custom Name for ' + selectedServer.name),
+						h(D.TextInput, {
+							defaultValue: serverDisplayName,
+							placeholder: selectedServer.name,
+							onChange: function (val) { aliasInputRef.current = val }
+						})
+					),
+					h(
+						D.TableRow,
+						{
+							label: 'Save Custom Nickname',
+							subLabel: 'Changes name inside this plugin only without modifying panel',
+							onPress: function () {
+								setServerAlias(currentServerId, aliasInputRef.current)
+							}
+						}
+					),
+					serverDisplayName !== selectedServer.name ? h(
+						D.TableRow,
+						{
+							label: 'Reset to Original Name',
+							subLabel: 'Restores default: ' + selectedServer.name,
+							onPress: function () {
+								setServerAlias(currentServerId, '')
+							}
+						}
+					) : null
+				),
 				h(
 					D.TableRowGroup,
 					{ title: 'Pterodactyl Panel Connection' },
@@ -931,18 +1591,20 @@
 					{ title: 'Switch Active Server' },
 					state.servers.map(function (s) {
 						var active = s.id === currentServerId
+						var sDisp = getServerDisplayName(s)
 						return h(
 							D.TableRow,
 							{
 								key: s.id,
-								label: (active ? '✓ ' : '') + s.name,
-								subLabel: 'ID: ' + s.id + ' (' + s.node + ')',
+								label: (active ? '✓ ' : '') + sDisp,
+								subLabel: 'ID: ' + s.id + (sDisp !== s.name ? ' (' + s.name + ')' : ''),
 								onPress: function () {
 									state.selectedServerId = s.id
 									saveSetting({ defaultServerId: s.id })
 									changed()
 									fetchResources(s.id)
-									toast('Selected: ' + s.name)
+									fetchServerDetails(s.id)
+									toast('Selected: ' + sDisp)
 								}
 							}
 						)
@@ -955,7 +1617,7 @@
 			D.ActionSheet,
 			{
 				title: 'Pterodactyl Controller',
-				subLabel: selectedServer ? selectedServer.name + ' (' + currentState.toUpperCase() + ')' : 'Server Dashboard'
+				subLabel: serverDisplayName + ' (' + currentState.toUpperCase() + ')'
 			},
 			renderTabs(),
 			activeTab === 'console'
@@ -975,6 +1637,7 @@
 						showsVerticalScrollIndicator: true
 					},
 					activeTab === 'status' ? renderStatusTab() :
+					activeTab === 'players' ? renderPlayersTab() :
 					activeTab === 'files' ? renderFilesTab() :
 					renderSettingsTab()
 				)
@@ -1123,6 +1786,7 @@
 				try {
 					valenced.discord.actions.ActionSheetActionCreators.hideActionSheet(SHEET_KEY)
 					valenced.discord.actions.ActionSheetActionCreators.hideActionSheet(VIEWER_SHEET_KEY)
+					valenced.discord.actions.ActionSheetActionCreators.hideActionSheet(PLAYER_SHEET_KEY)
 				} catch (e) {}
 			})
 		}
