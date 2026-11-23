@@ -36,6 +36,17 @@ Save and monitor your favorite Minecraft servers directly from Discord.
 
 ---
 
+### 🦖 Pterodactyl Controller (`asaprajx.pterodactyl`)
+Control and monitor your Pterodactyl game servers directly from Discord mobile with a modern Discord Mobile UI.
+* **Live Server Metrics:** Real-time CPU load %, RAM usage (used/max), Disk storage, uptime counter, and dynamic status pills (`ONLINE`, `STARTING`, `STOPPING`, `OFFLINE`).
+* **Power Controls:** 1-tap Start, Restart, Graceful Stop, and Emergency Kill buttons with tactile status colors.
+* **Minecraft Players Hub:** View online players with 3D skin heads (`mc-heads.net`), role tags (`👑 OP`, `✓ Whitelist`), and full-height in-sheet moderation actions (`/op`, `/deop`, `/whitelist`, `/kick`, `/ban`, `/pardon`, `/tp`, `/gamemode`).
+* **Console & Terminal:** Execute commands with 1-tap quick command pills (`/list`, `/tps`, `/whitelist list`, `/say`, `/save-all`, etc.) and read live `latest.log` output with chronological/newest-top ordering and auto-scroll.
+* **File Explorer:** Browse server directory files with breadcrumb navigation, filetype badges (`📁`, `📄`, `⚙️`, `📦`), size indicators, and a full-height dark file viewer.
+* **Modern Design:** Built with modern Discord design tokens, capsule pill tabs, and elevated surface cards. Quick launch from Discord's chat attachment `+` menu.
+
+---
+
 ## ⚠️ Disclaimer & Feedback
 
 > **Notice:** These plugins are created and maintained with the assistance of AI and are developed primarily for **my own personal use and experiments**. 
