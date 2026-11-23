@@ -121,6 +121,30 @@
           }
         }
       }
+    },
+    "asaprajx.pterodactyl": {
+      "name": "Pterodactyl Controller",
+      "description": "Control your Pterodactyl game servers directly from Discord mobile: live CPU/RAM stats, power controls, console commands, and file browsing.",
+      "author": "asaprajx (https://github.com/asaprajx \"GitHub\")",
+      "icon": "ServerIcon",
+      "channels": {
+        "latest": "1.0.0"
+      },
+      "versions": {
+        "1.0.0": {
+          "url": "https://raw.githubusercontent.com/asaprajx/ASAP-plugins/gh-pages/pool/asaprajx.pterodactyl@1.0.0.zip",
+          "sha256": "0c07a9ddac5f3d81cbcf080b3bb727af414102e99063da92b7e34f29f62491c1",
+          "size": 15881,
+          "dependencies": {
+            "valenced.api": {
+              "version": ">=1 <2"
+            },
+            "discord": {
+              "version": "*"
+            }
+          }
+        }
+      }
     }
   }
 }
