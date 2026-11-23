@@ -1,7 +1,8 @@
 (function (exports) {
 	/*
 	 * Pterodactyl Server Controller for Valenced Discord Mobile.
-	 * Monitor live CPU/RAM/Disk, send console commands, browse server files, trigger power actions, and manage players.
+	 * Modern Discord Mobile UI overhaul: sleek capsule navigation, hero server cards, visual resource gauges,
+	 * Minecraft player hub, IDE-style terminal console, file explorer, and server manager.
 	 * Keep `(function` as the first thing in this file: Valenced loads it as `return <file>`.
 	 */
 	var PLUGIN_ID = 'asaprajx.pterodactyl'
@@ -10,11 +11,21 @@
 	var PLAYER_SHEET_KEY = 'asaprajx.pterodactyl.playeractions'
 	var TOAST_ID = 'ASAP_PTERODACTYL'
 
+	// ---- Modern Discord Color Tokens --------------------------------------------------------
 	var GREEN = '#23a55a'
 	var RED = '#f23f43'
 	var AMBER = '#f0b232'
 	var GRAY = '#80848e'
 	var BLURPLE = '#5865f2'
+	var CRIMSON = '#da373c'
+
+	var BG_BASE = '#111214'
+	var BG_SURFACE = '#1e1f22'
+	var BG_RAISED = '#2b2d31'
+	var BG_HOVER = '#35373c'
+	var BORDER_SUBTLE = 'rgba(255, 255, 255, 0.07)'
+	var TEXT_NORMAL = '#f2f3f5'
+	var TEXT_MUTED = '#949ba4'
 
 	var defaults = {
 		panelUrl: 'https://panel.altare.global',
@@ -58,7 +69,14 @@
 	function finders() { return valenced.modules.finders }
 	function Design() { return valenced.discord.design.Design }
 
-	// ---- Native Cookie Clearing (Prevents 419 CSRF Token Mismatch) --------------------------
+	// ---- Helpers ----------------------------------------------------------------------------
+	function tint(hex, alpha) {
+		var m = /^#([0-9a-f]{6})$/i.exec(hex)
+		if (!m) return hex
+		var n = parseInt(m[1], 16)
+		return 'rgba(' + ((n >> 16) & 255) + ',' + ((n >> 8) & 255) + ',' + (n & 255) + ',' + alpha + ')'
+	}
+
 	function clearCookies() {
 		try {
 			var RN = valenced.react.ReactNative
@@ -70,7 +88,6 @@
 		} catch (e) {}
 	}
 
-	// ---- URL Sanitization & Server ID Extraction -------------------------------------------
 	function cleanPanelUrl(raw) {
 		var s = String(raw || '').trim()
 		if (!s) return 'https://panel.altare.global'
@@ -184,6 +201,7 @@
 	function T(props, text) {
 		var D = Design()
 		var p = Object.assign({}, props)
+		p.style = Object.assign({ includeFontPadding: false }, p.style || {})
 		return h(D.Text, p, text)
 	}
 
@@ -210,6 +228,17 @@
 		if (b < 1024 * 1024) return (b / 1024).toFixed(1) + ' KB'
 		if (b < 1024 * 1024 * 1024) return (b / (1024 * 1024)).toFixed(1) + ' MB'
 		return (b / (1024 * 1024 * 1024)).toFixed(2) + ' GB'
+	}
+
+	function formatUptime(seconds) {
+		if (!seconds || isNaN(seconds)) return 'Offline'
+		var s = Math.floor(Number(seconds))
+		var d = Math.floor(s / 86400)
+		var h = Math.floor((s % 86400) / 3600)
+		var m = Math.floor((s % 3600) / 60)
+		if (d > 0) return d + 'd ' + h + 'h ' + m + 'm'
+		if (h > 0) return h + 'h ' + m + 'm'
+		return m + 'm ' + (s % 60) + 's'
 	}
 
 	// Safe BottomSheet / ActionSheet ScrollView with ErrorBoundary fallback
@@ -254,6 +283,78 @@
 		return h(Boundary, { fallback: plain }, h(Scroll, scrollProps, children))
 	}
 
+	// ---- Modern UI Design Blocks ------------------------------------------------------------
+	function Card(props) {
+		var RN = valenced.react.ReactNative
+		return h(
+			RN.View,
+			{
+				style: Object.assign({
+					backgroundColor: BG_SURFACE,
+					borderRadius: 14,
+					padding: 14,
+					borderWidth: 1,
+					borderColor: BORDER_SUBTLE,
+					marginBottom: 10
+				}, props.style || {})
+			},
+			props.children
+		)
+	}
+
+	function StatusPill(props) {
+		var RN = valenced.react.ReactNative
+		var c = props.color || GRAY
+		return h(
+			RN.View,
+			{
+				style: {
+					flexDirection: 'row',
+					alignItems: 'center',
+					justifyContent: 'center',
+					height: 24,
+					paddingHorizontal: 8,
+					borderRadius: 12,
+					backgroundColor: tint(c, 0.16)
+				}
+			},
+			h(RN.View, { style: { width: 6, height: 6, borderRadius: 3, backgroundColor: c, marginRight: 5 } }),
+			T({ variant: 'text-xs/bold', style: { color: c, textTransform: 'uppercase', includeFontPadding: false, textAlignVertical: 'center' } }, props.text)
+		)
+	}
+
+	function ProgressBar(props) {
+		var RN = valenced.react.ReactNative
+		var val = Math.min(100, Math.max(0, Number(props.percent) || 0))
+		var c = props.color || GREEN
+		return h(
+			RN.View,
+			{ style: { height: 4, borderRadius: 2, backgroundColor: BG_RAISED, overflow: 'hidden', marginTop: 6 } },
+			h(RN.View, { style: { width: val + '%', height: '100%', borderRadius: 2, backgroundColor: c } })
+		)
+	}
+
+	function StatWidget(props) {
+		var RN = valenced.react.ReactNative
+		return h(
+			RN.View,
+			{
+				style: Object.assign({
+					flex: 1,
+					backgroundColor: BG_SURFACE,
+					borderRadius: 14,
+					padding: 12,
+					borderWidth: 1,
+					borderColor: BORDER_SUBTLE
+				}, props.style || {})
+			},
+			T({ variant: 'text-xs/semibold', style: { color: TEXT_MUTED } }, props.label),
+			T({ variant: 'heading-sm/bold', style: { color: TEXT_NORMAL, marginTop: 2 } }, props.value),
+			props.percent != null ? h(ProgressBar, { percent: props.percent, color: props.color || GREEN }) : null,
+			props.sub ? T({ variant: 'text-xs/medium', style: { color: TEXT_MUTED, marginTop: 4 } }, props.sub) : null
+		)
+	}
+
 	// ======================================================================================
 	// API Client
 	// ======================================================================================
@@ -285,7 +386,6 @@
 
 		return fetch(url, fetchOpts).then(function (res) {
 			if (res.status === 204) return { success: true }
-			// Automatic 419 CSRF recovery: Clear native cookie store and retry once
 			if (res.status === 419 && !options._retried) {
 				clearCookies()
 				options._retried = true
@@ -470,7 +570,7 @@
 	}
 
 	// ======================================================================================
-	// Multi-Service Status Engine (Avoids Pterodactyl API Rate Limits)
+	// Multi-Service Status Engine (Zero Pterodactyl Rate Limits)
 	// ======================================================================================
 	function queryStatusTimeout(url, ms) {
 		return new Promise(function (resolve, reject) {
@@ -497,7 +597,6 @@
 		var cleanHost = encodeURIComponent(host)
 		var cleanPort = encodeURIComponent(port || 25565)
 
-		// 1. mcstatus.io (Primary)
 		var tryMcstatus = function () {
 			return queryStatusTimeout('https://api.mcstatus.io/v2/status/java/' + target, 3500).then(function (data) {
 				if (!data || !data.online) throw new Error('Offline or invalid data')
@@ -517,7 +616,6 @@
 			})
 		}
 
-		// 2. mcsrvstat.us (1st Fallback)
 		var tryMcsrvstat = function () {
 			return queryStatusTimeout('https://api.mcsrvstat.us/3/' + target, 3500).then(function (data) {
 				if (!data || !data.online) throw new Error('Offline or invalid data')
@@ -541,7 +639,6 @@
 			})
 		}
 
-		// 3. minetools.eu (2nd Fallback)
 		var tryMinetools = function () {
 			return queryStatusTimeout('https://api.minetools.eu/ping/' + cleanHost + '/' + cleanPort, 3500).then(function (data) {
 				if (!data || data.error) throw new Error('Offline or invalid data')
@@ -581,16 +678,12 @@
 		var host = details.host || 'in-mum01.altare.global'
 		var port = details.port || 25297
 
-		// 1. Read registered players from usercache.json
 		var usercachePromise = readFile(id, 'usercache.json').then(function (content) {
 			try {
 				var parsed = typeof content === 'string' ? JSON.parse(content) : content
 				if (Array.isArray(parsed)) {
 					state.knownPlayers = parsed.map(function (p) {
-						return {
-							name: p.name || 'Player',
-							uuid: p.uuid || ''
-						}
+						return { name: p.name || 'Player', uuid: p.uuid || '' }
 					})
 				}
 			} catch (e) {
@@ -600,7 +693,6 @@
 			state.knownPlayers = []
 		})
 
-		// 2. Read operators from ops.json
 		var opsPromise = readFile(id, 'ops.json').then(function (content) {
 			try {
 				var parsed = typeof content === 'string' ? JSON.parse(content) : content
@@ -614,7 +706,6 @@
 			state.opsList = []
 		})
 
-		// 3. Read whitelist from whitelist.json
 		var whitelistPromise = readFile(id, 'whitelist.json').then(function (content) {
 			try {
 				var parsed = typeof content === 'string' ? JSON.parse(content) : content
@@ -628,7 +719,6 @@
 			state.whitelist = []
 		})
 
-		// 4. Query Minecraft Status via external providers (Zero API Key Rate-Limit)
 		var statusPromise = queryMinecraftStatus(host, port).then(function (res) {
 			state.statusProvider = res.provider
 			state.onlinePlayerCount = res.playerCount
@@ -673,17 +763,39 @@
 
 		return h(
 			D.ActionSheet,
-			{ title: props.fileName, subLabel: props.filePath },
+			null,
+			// Header
+			h(
+				RN.View,
+				{ style: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 14, marginBottom: 10 } },
+				h(
+					RN.View,
+					{ style: { flex: 1, marginRight: 10 } },
+					T({ variant: 'heading-md/bold', style: { color: TEXT_NORMAL } }, props.fileName),
+					T({ variant: 'text-xs/medium', style: { color: TEXT_MUTED } }, props.filePath)
+				),
+				h(
+					RN.TouchableOpacity,
+					{
+						onPress: function () {
+							try { valenced.discord.actions.ActionSheetActionCreators.hideActionSheet(VIEWER_SHEET_KEY) } catch (e) {}
+						},
+						style: { backgroundColor: BG_RAISED, width: 30, height: 30, borderRadius: 15, alignItems: 'center', justifyContent: 'center' }
+					},
+					T({ variant: 'text-xs/bold', style: { color: TEXT_MUTED } }, '✕')
+				)
+			),
+			// Content Area
 			scrollView(
 				RN,
 				{
 					style: {
 						height: viewerHeight,
-						backgroundColor: '#111214',
-						borderRadius: 8,
-						marginHorizontal: 10,
+						backgroundColor: '#0c0d0e',
+						borderRadius: 12,
+						marginHorizontal: 14,
 						borderWidth: 1,
-						borderColor: '#2b2d31'
+						borderColor: BORDER_SUBTLE
 					},
 					contentContainerStyle: {
 						padding: 12,
@@ -694,16 +806,17 @@
 				},
 				T({ variant: 'code', style: { color: '#dbdee1', fontSize: 11, fontFamily: 'monospace', lineHeight: 16 } }, props.content || '(Empty file)')
 			),
+			// Action Bar
 			h(
 				RN.View,
-				{ style: { flexDirection: 'row', paddingHorizontal: 10, paddingTop: 10, paddingBottom: 20 } },
+				{ style: { flexDirection: 'row', paddingHorizontal: 14, paddingTop: 10, paddingBottom: 20 } },
 				h(
 					RN.TouchableOpacity,
 					{
 						onPress: function () { copyText(props.content || '', props.fileName) },
-						style: { flex: 1, backgroundColor: '#2b2d31', paddingVertical: 12, borderRadius: 8, alignItems: 'center', marginRight: 6 }
+						style: { flex: 1, height: 40, backgroundColor: BG_RAISED, borderRadius: 10, alignItems: 'center', justifyContent: 'center', marginRight: 8 }
 					},
-					T({ variant: 'text-sm/bold', style: { color: '#f2f3f5' } }, 'Copy Content')
+					T({ variant: 'text-sm/bold', style: { color: TEXT_NORMAL } }, 'Copy Content')
 				),
 				h(
 					RN.TouchableOpacity,
@@ -711,7 +824,7 @@
 						onPress: function () {
 							try { valenced.discord.actions.ActionSheetActionCreators.hideActionSheet(VIEWER_SHEET_KEY) } catch (e) {}
 						},
-						style: { flex: 1, backgroundColor: BLURPLE, paddingVertical: 12, borderRadius: 8, alignItems: 'center', marginLeft: 6 }
+						style: { flex: 1, height: 40, backgroundColor: BLURPLE, borderRadius: 10, alignItems: 'center', justifyContent: 'center' }
 					},
 					T({ variant: 'text-sm/bold', style: { color: '#ffffff' } }, 'Close')
 				)
@@ -823,59 +936,78 @@
 		else if (currentState === 'starting' || currentState === 'stopping') stateColor = AMBER
 		else if (currentState === 'offline') stateColor = RED
 
-		// Navigation Tabs Header
+		// Navigation Tabs Header (Modern Discord Capsule Pill Bar)
 		function renderTabs() {
 			var tabs = [
-				{ id: 'status', label: 'Status' },
-				{ id: 'players', label: 'Players' },
-				{ id: 'console', label: 'Console' },
-				{ id: 'files', label: 'Files' },
-				{ id: 'settings', label: 'Config' }
+				{ id: 'status', label: 'Overview', icon: '📊' },
+				{ id: 'players', label: 'Players', icon: '👥' },
+				{ id: 'console', label: 'Console', icon: '💻' },
+				{ id: 'files', label: 'Files', icon: '📁' },
+				{ id: 'settings', label: 'Settings', icon: '⚙️' }
 			]
 			return h(
 				RN.View,
-				{ style: { flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 12, marginBottom: 12 } },
-				tabs.map(function (tab) {
-					var isActive = activeTab === tab.id
-					return h(
-						RN.TouchableOpacity,
-						{
-							key: tab.id,
-							onPress: function () {
-								setActiveTab(tab.id)
-								if (tab.id === 'files' && !state.files.length) {
-									fetchFiles(currentServerId, '/')
-								}
-								if (tab.id === 'console' && !state.logs) {
-									fetchLogs(currentServerId)
-								}
-								if (tab.id === 'players') {
-									setSelectedPlayer(null)
-									fetchPlayers(currentServerId)
+				{ style: { marginBottom: 12, paddingTop: 4 } },
+				h(
+					RN.ScrollView,
+					{
+						horizontal: true,
+						showsHorizontalScrollIndicator: false,
+						contentContainerStyle: { paddingHorizontal: 14, alignItems: 'center' }
+					},
+					tabs.map(function (tab, idx) {
+						var isActive = activeTab === tab.id
+						return h(
+							RN.TouchableOpacity,
+							{
+								key: tab.id,
+								onPress: function () {
+									setActiveTab(tab.id)
+									if (tab.id === 'files' && !state.files.length) {
+										fetchFiles(currentServerId, '/')
+									}
+									if (tab.id === 'console' && !state.logs) {
+										fetchLogs(currentServerId)
+									}
+									if (tab.id === 'players') {
+										setSelectedPlayer(null)
+										fetchPlayers(currentServerId)
+									}
+								},
+								style: {
+									flexDirection: 'row',
+									alignItems: 'center',
+									justifyContent: 'center',
+									height: 34,
+									paddingHorizontal: 12,
+									borderRadius: 17,
+									backgroundColor: isActive ? BLURPLE : BG_RAISED,
+									borderWidth: 1,
+									borderColor: isActive ? 'transparent' : BORDER_SUBTLE,
+									marginRight: idx < tabs.length - 1 ? 8 : 0
 								}
 							},
-							style: {
-								flex: 1,
-								marginHorizontal: 2,
-								paddingVertical: 10,
-								borderRadius: 18,
-								alignItems: 'center',
-								backgroundColor: isActive ? BLURPLE : '#2b2d31'
-							}
-						},
-						T({ variant: 'text-xs/bold', style: { color: isActive ? '#ffffff' : '#b5bac1' } }, tab.label)
-					)
-				})
+							T({ variant: 'text-xs/bold', style: { marginRight: 6, includeFontPadding: false, textAlignVertical: 'center' } }, tab.icon),
+							T({ variant: 'text-sm/bold', style: { color: isActive ? '#ffffff' : TEXT_MUTED, includeFontPadding: false, textAlignVertical: 'center' } }, tab.label)
+						)
+					})
+				)
 			)
 		}
 
-		// TAB 1: STATUS & POWER (With Server Icon & Rename support)
+		// TAB 1: OVERVIEW & SERVER STATUS
 		function renderStatusTab() {
-			var cpuPercent = (res.cpu_absolute != null ? res.cpu_absolute.toFixed(1) : '0') + '%'
+			var cpuNum = res.cpu_absolute != null ? res.cpu_absolute : 0
+			var cpuPercentStr = cpuNum.toFixed(1) + '%'
 			var memStr = formatBytes(res.memory_bytes)
-			var memLimit = (selectedServer.limits && selectedServer.limits.memory ? selectedServer.limits.memory + ' MB' : 'Unlimited')
+			var memMaxMB = selectedServer.limits && selectedServer.limits.memory ? Number(selectedServer.limits.memory) : 0
+			var memLimitStr = memMaxMB ? memMaxMB + ' MB' : 'Unlimited'
+			var memPercent = memMaxMB ? Math.min(100, Math.round(((Number(res.memory_bytes) || 0) / (memMaxMB * 1024 * 1024)) * 100)) : 0
+
 			var diskStr = formatBytes(res.disk_bytes)
-			var diskLimit = (selectedServer.limits && selectedServer.limits.disk ? selectedServer.limits.disk + ' MB' : 'Unlimited')
+			var diskMaxMB = selectedServer.limits && selectedServer.limits.disk ? Number(selectedServer.limits.disk) : 0
+			var diskLimitStr = diskMaxMB ? diskMaxMB + ' MB' : 'Unlimited'
+			var diskPercent = diskMaxMB ? Math.min(100, Math.round(((Number(res.disk_bytes) || 0) / (diskMaxMB * 1024 * 1024)) * 100)) : 0
 
 			var details = state.serverDetails[currentServerId] || {}
 			var hostPort = details.host ? details.host + ':' + (details.port || 25297) : (selectedServer.node ? selectedServer.node : '')
@@ -883,24 +1015,23 @@
 			var serverAssetId = valenced.assets.getAssetIdByName('ServerIcon') || valenced.assets.getAssetIdByName('GameControllerIcon')
 			var faviconUri = state.serverFavicon
 
-			// Server Icon box
 			var iconElem = faviconUri
-				? h(RN.Image, { source: { uri: faviconUri }, style: { width: 44, height: 44, borderRadius: 10, marginRight: 10 } })
+				? h(RN.Image, { source: { uri: faviconUri }, style: { width: 48, height: 48, borderRadius: 12, marginRight: 12 } })
 				: h(
 					RN.View,
-					{ style: { width: 44, height: 44, borderRadius: 10, backgroundColor: BLURPLE, justifyContent: 'center', alignItems: 'center', marginRight: 10 } },
+					{ style: { width: 48, height: 48, borderRadius: 12, backgroundColor: BLURPLE, justifyContent: 'center', alignItems: 'center', marginRight: 12 } },
 					serverAssetId
-						? h(RN.Image, { source: serverAssetId, style: { width: 24, height: 24, tintColor: '#ffffff' } })
-						: T({ variant: 'heading-md/bold', style: { color: '#ffffff' } }, '🎮')
+						? h(RN.Image, { source: serverAssetId, style: { width: 26, height: 26, tintColor: '#ffffff' } })
+						: T({ variant: 'heading-lg/bold', style: { color: '#ffffff' } }, '🎮')
 				)
 
 			return h(
 				RN.View,
-				{ style: { paddingHorizontal: 10 } },
-				// Server Header Card
+				{ style: { paddingHorizontal: 14 } },
+				// Hero Server Profile Card
 				h(
-					RN.View,
-					{ style: { backgroundColor: '#1e1f22', borderRadius: 12, padding: 14, marginBottom: 14 } },
+					Card,
+					null,
 					h(
 						RN.View,
 						{ style: { flexDirection: 'row', alignItems: 'center' } },
@@ -911,7 +1042,7 @@
 							h(
 								RN.View,
 								{ style: { flexDirection: 'row', alignItems: 'center' } },
-								T({ variant: 'heading-md/bold', style: { color: '#f2f3f5', marginRight: 6 } }, serverDisplayName),
+								T({ variant: 'heading-md/bold', style: { color: TEXT_NORMAL, marginRight: 6 } }, serverDisplayName),
 								h(
 									RN.TouchableOpacity,
 									{
@@ -925,21 +1056,35 @@
 								)
 							),
 							serverDisplayName !== selectedServer.name
-								? T({ variant: 'text-xs/medium', style: { color: '#949ba4' } }, 'Panel: ' + selectedServer.name)
+								? T({ variant: 'text-xs/medium', style: { color: TEXT_MUTED } }, 'Panel: ' + selectedServer.name)
 								: null,
-							T({ variant: 'text-xs/medium', style: { color: '#949ba4' } }, 'ID: ' + selectedServer.id + (hostPort ? ' | ' + hostPort : ''))
+							T({ variant: 'text-xs/medium', style: { color: TEXT_MUTED } }, 'ID: ' + selectedServer.id + (selectedServer.node ? ' • ' + selectedServer.node : ''))
 						),
-						h(
-							RN.View,
-							{ style: { backgroundColor: stateColor, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12 } },
-							T({ variant: 'text-xs/bold', style: { color: '#ffffff' } }, currentState.toUpperCase())
-						)
+						h(StatusPill, { text: currentState, color: stateColor })
 					),
-					// Inline Rename Field (If toggled)
+					// Address Pill
+					hostPort ? h(
+						RN.TouchableOpacity,
+						{
+							onPress: function () { copyText(hostPort, 'Server address') },
+							style: {
+								flexDirection: 'row',
+								alignItems: 'center',
+								backgroundColor: BG_BASE,
+								height: 32,
+								paddingHorizontal: 10,
+								borderRadius: 8,
+								marginTop: 10
+							}
+						},
+						T({ variant: 'text-xs/semibold', style: { color: TEXT_MUTED, flex: 1 } }, 'Address: ' + hostPort),
+						T({ variant: 'text-xs/bold', style: { color: BLURPLE } }, '⧉ Copy')
+					) : null,
+					// Inline Rename Card
 					isEditingName ? h(
 						RN.View,
-						{ style: { marginTop: 12, padding: 10, backgroundColor: '#2b2d31', borderRadius: 8 } },
-						T({ variant: 'text-xs/semibold', style: { color: '#dbdee1', marginBottom: 4 } }, 'Rename Server (Inside Plugin Only):'),
+						{ style: { marginTop: 10, padding: 10, backgroundColor: BG_RAISED, borderRadius: 10 } },
+						T({ variant: 'text-xs/semibold', style: { color: TEXT_MUTED, marginBottom: 6 } }, 'Rename Server (Local inside plugin):'),
 						h(
 							RN.View,
 							{ style: { flexDirection: 'row', alignItems: 'center' } },
@@ -959,7 +1104,7 @@
 										setServerAlias(currentServerId, newNameInputRef.current)
 										setIsEditingName(false)
 									},
-									style: { backgroundColor: GREEN, paddingHorizontal: 12, paddingVertical: 10, borderRadius: 6, marginRight: 4 }
+									style: { backgroundColor: GREEN, height: 36, paddingHorizontal: 12, borderRadius: 8, alignItems: 'center', justifyContent: 'center', marginRight: 4 }
 								},
 								T({ variant: 'text-xs/bold', style: { color: '#ffffff' } }, 'Save')
 							),
@@ -970,68 +1115,98 @@
 										setServerAlias(currentServerId, '')
 										setIsEditingName(false)
 									},
-									style: { backgroundColor: '#383a40', paddingHorizontal: 8, paddingVertical: 10, borderRadius: 6 }
+									style: { backgroundColor: BG_HOVER, height: 36, paddingHorizontal: 10, borderRadius: 8, alignItems: 'center', justifyContent: 'center' }
 								},
-								T({ variant: 'text-xs/medium', style: { color: '#dbdee1' } }, 'Reset')
+								T({ variant: 'text-xs/medium', style: { color: TEXT_NORMAL } }, 'Reset')
 							) : null
 						)
-					) : null,
-					h(RN.View, { style: { height: 1, backgroundColor: '#2b2d31', marginVertical: 12 } }),
-					// Metrics Row
-					h(
-						RN.View,
-						{ style: { flexDirection: 'row', justifyContent: 'space-between' } },
-						h(RN.View, null, T({ variant: 'text-xs/medium', style: { color: '#949ba4' } }, 'CPU Load'), T({ variant: 'heading-sm/bold', style: { color: '#ffffff', marginTop: 2 } }, cpuPercent)),
-						h(RN.View, null, T({ variant: 'text-xs/medium', style: { color: '#949ba4' } }, 'Memory (RAM)'), T({ variant: 'heading-sm/bold', style: { color: '#ffffff', marginTop: 2 } }, memStr + ' / ' + memLimit)),
-						h(RN.View, null, T({ variant: 'text-xs/medium', style: { color: '#949ba4' } }, 'Disk Storage'), T({ variant: 'heading-sm/bold', style: { color: '#ffffff', marginTop: 2 } }, diskStr + ' / ' + diskLimit))
-					)
+					) : null
 				),
-				// Power Action Buttons Row
-				T({ variant: 'eyebrow', style: { color: '#949ba4', marginBottom: 8 } }, 'POWER CONTROLS'),
+				// Modern Resource Widgets
 				h(
 					RN.View,
-					{ style: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 16 } },
+					{ style: { flexDirection: 'row', marginBottom: 10 } },
+					h(StatWidget, { style: { marginRight: 8 }, label: 'CPU LOAD', value: cpuPercentStr, percent: Math.min(100, Math.round(cpuNum)), color: cpuNum > 80 ? RED : cpuNum > 50 ? AMBER : GREEN }),
+					h(StatWidget, { style: { marginRight: 8 }, label: 'MEMORY (RAM)', value: memStr, percent: memPercent, sub: memLimitStr, color: memPercent > 85 ? RED : memPercent > 65 ? AMBER : GREEN }),
+					h(StatWidget, { label: 'STORAGE (DISK)', value: diskStr, percent: diskPercent, sub: diskLimitStr, color: diskPercent > 90 ? RED : GREEN })
+				),
+				// Power Actions Card
+				h(
+					Card,
+					null,
+					T({ variant: 'eyebrow', style: { color: TEXT_MUTED, marginBottom: 10 } }, 'POWER CONTROLS'),
 					h(
-						RN.TouchableOpacity,
-						{
-							onPress: function () { sendPower(currentServerId, 'start') },
-							style: { flex: 1, backgroundColor: GREEN, paddingVertical: 12, borderRadius: 8, alignItems: 'center', marginHorizontal: 3 }
-						},
-						T({ variant: 'text-sm/bold', style: { color: '#ffffff' } }, 'Start')
-					),
-					h(
-						RN.TouchableOpacity,
-						{
-							onPress: function () { sendPower(currentServerId, 'restart') },
-							style: { flex: 1, backgroundColor: AMBER, paddingVertical: 12, borderRadius: 8, alignItems: 'center', marginHorizontal: 3 }
-						},
-						T({ variant: 'text-sm/bold', style: { color: '#111214' } }, 'Restart')
-					),
-					h(
-						RN.TouchableOpacity,
-						{
-							onPress: function () { sendPower(currentServerId, 'stop') },
-							style: { flex: 1, backgroundColor: RED, paddingVertical: 12, borderRadius: 8, alignItems: 'center', marginHorizontal: 3 }
-						},
-						T({ variant: 'text-sm/bold', style: { color: '#ffffff' } }, 'Stop')
-					),
-					h(
-						RN.TouchableOpacity,
-						{
-							onPress: function () { sendPower(currentServerId, 'kill') },
-							style: { flex: 1, backgroundColor: '#800000', paddingVertical: 12, borderRadius: 8, alignItems: 'center', marginHorizontal: 3 }
-						},
-						T({ variant: 'text-sm/bold', style: { color: '#ffffff' } }, 'Kill')
+						RN.View,
+						{ style: { flexDirection: 'row' } },
+						h(
+							RN.TouchableOpacity,
+							{
+								onPress: function () { sendPower(currentServerId, 'start') },
+								style: { flex: 1, height: 40, backgroundColor: GREEN, borderRadius: 10, alignItems: 'center', justifyContent: 'center', marginRight: 6 }
+							},
+							T({ variant: 'text-sm/bold', style: { color: '#ffffff' } }, '▶ Start')
+						),
+						h(
+							RN.TouchableOpacity,
+							{
+								onPress: function () { sendPower(currentServerId, 'restart') },
+								style: { flex: 1, height: 40, backgroundColor: AMBER, borderRadius: 10, alignItems: 'center', justifyContent: 'center', marginRight: 6 }
+							},
+							T({ variant: 'text-sm/bold', style: { color: '#111214' } }, '⟳ Restart')
+						),
+						h(
+							RN.TouchableOpacity,
+							{
+								onPress: function () { sendPower(currentServerId, 'stop') },
+								style: { flex: 1, height: 40, backgroundColor: RED, borderRadius: 10, alignItems: 'center', justifyContent: 'center', marginRight: 6 }
+							},
+							T({ variant: 'text-sm/bold', style: { color: '#ffffff' } }, '■ Stop')
+						),
+						h(
+							RN.TouchableOpacity,
+							{
+								onPress: function () { sendPower(currentServerId, 'kill') },
+								style: { flex: 1, height: 40, backgroundColor: CRIMSON, borderRadius: 10, alignItems: 'center', justifyContent: 'center' }
+							},
+							T({ variant: 'text-sm/bold', style: { color: '#ffffff' } }, '⚡ Kill')
+						)
 					)
 				),
-				// Refresh Button
+				// Uptime & Refresh Bar
 				h(
-					D.Button,
+					RN.View,
 					{
-						variant: 'secondary',
-						text: state.loadingStats ? 'Refreshing...' : 'Refresh Status',
-						onPress: function () { fetchResources(currentServerId) }
-					}
+						style: {
+							flexDirection: 'row',
+							justifyContent: 'space-between',
+							alignItems: 'center',
+							backgroundColor: BG_SURFACE,
+							borderRadius: 12,
+							paddingHorizontal: 12,
+							paddingVertical: 10,
+							borderWidth: 1,
+							borderColor: BORDER_SUBTLE,
+							marginBottom: 10
+						}
+					},
+					T({ variant: 'text-xs/medium', style: { color: TEXT_MUTED } }, '⏱️ Uptime: ' + formatUptime(res.uptime)),
+					h(
+						RN.TouchableOpacity,
+						{
+							onPress: function () { fetchResources(currentServerId) },
+							style: {
+								backgroundColor: BG_RAISED,
+								paddingHorizontal: 12,
+								height: 28,
+								borderRadius: 8,
+								alignItems: 'center',
+								justifyContent: 'center',
+								borderWidth: 1,
+								borderColor: BORDER_SUBTLE
+							}
+						},
+						T({ variant: 'text-xs/bold', style: { color: BLURPLE } }, state.loadingStats ? 'Refreshing…' : '⟳ Refresh Metrics')
+					)
 				)
 			)
 		}
@@ -1042,7 +1217,7 @@
 			var pLower = pName.toLowerCase()
 			var isOp = state.opsList.indexOf(pLower) !== -1
 			var isWl = state.whitelist.indexOf(pLower) !== -1
-			var headUrl = 'https://mc-heads.net/avatar/' + encodeURIComponent(pName) + '/48'
+			var headUrl = 'https://mc-heads.net/avatar/' + encodeURIComponent(pName) + '/54'
 
 			function runCmd(cmd, label) {
 				sendCommand(currentServerId, cmd)
@@ -1053,91 +1228,95 @@
 
 			return h(
 				RN.View,
-				{ style: { paddingHorizontal: 10 } },
+				{ style: { paddingHorizontal: 14 } },
 				// Back Button
 				h(
 					RN.TouchableOpacity,
 					{
 						onPress: goBack,
-						style: { flexDirection: 'row', alignItems: 'center', marginBottom: 12, paddingVertical: 6 }
+						style: { flexDirection: 'row', alignItems: 'center', marginBottom: 12, paddingVertical: 4 }
 					},
 					T({ variant: 'text-sm/bold', style: { color: BLURPLE } }, '‹ Back to All Players')
 				),
-				// Player Card
+				// Player Hero Profile Card
 				h(
-					RN.View,
-					{ style: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#1e1f22', padding: 14, borderRadius: 12, marginBottom: 16 } },
-					h(RN.Image, { source: { uri: headUrl }, style: { width: 48, height: 48, borderRadius: 10, marginRight: 12 } }),
+					Card,
+					null,
 					h(
 						RN.View,
-						{ style: { flex: 1 } },
-						T({ variant: 'heading-md/bold', style: { color: '#ffffff' } }, pName),
+						{ style: { flexDirection: 'row', alignItems: 'center' } },
+						h(RN.Image, { source: { uri: headUrl }, style: { width: 50, height: 50, borderRadius: 12, marginRight: 12 } }),
 						h(
 							RN.View,
-							{ style: { flexDirection: 'row', alignItems: 'center', marginTop: 4 } },
-							isOp ? h(
+							{ style: { flex: 1 } },
+							T({ variant: 'heading-md/bold', style: { color: TEXT_NORMAL } }, pName),
+							h(
 								RN.View,
-								{ style: { backgroundColor: AMBER, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6, marginRight: 6 } },
-								T({ variant: 'text-xs/bold', style: { color: '#111214' } }, '👑 OPERATOR')
-							) : null,
-							isWl ? h(
-								RN.View,
-								{ style: { backgroundColor: GREEN, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6, marginRight: 6 } },
-								T({ variant: 'text-xs/bold', style: { color: '#ffffff' } }, '✅ WHITELISTED')
-							) : null,
-							!isOp && !isWl ? T({ variant: 'text-xs/medium', style: { color: '#949ba4' } }, 'Regular Player') : null
-						),
-						p.uuid ? h(
-							RN.TouchableOpacity,
-							{ onPress: function () { copyText(p.uuid, 'Player UUID') }, style: { marginTop: 4 } },
-							T({ variant: 'text-xs/medium', style: { color: '#949ba4' } }, 'UUID: ' + p.uuid.slice(0, 18) + '... ⧉')
-						) : null
+								{ style: { flexDirection: 'row', alignItems: 'center', marginTop: 4 } },
+								isOp ? h(
+									RN.View,
+									{ style: { backgroundColor: tint(AMBER, 0.2), height: 22, paddingHorizontal: 8, borderRadius: 11, alignItems: 'center', justifyContent: 'center', marginRight: 6 } },
+									T({ variant: 'text-xs/bold', style: { color: AMBER } }, '👑 OPERATOR')
+								) : null,
+								isWl ? h(
+									RN.View,
+									{ style: { backgroundColor: tint(GREEN, 0.2), height: 22, paddingHorizontal: 8, borderRadius: 11, alignItems: 'center', justifyContent: 'center', marginRight: 6 } },
+									T({ variant: 'text-xs/bold', style: { color: GREEN } }, '✅ WHITELISTED')
+								) : null,
+								!isOp && !isWl ? T({ variant: 'text-xs/medium', style: { color: TEXT_MUTED } }, 'Regular Player') : null
+							),
+							p.uuid ? h(
+								RN.TouchableOpacity,
+								{ onPress: function () { copyText(p.uuid, 'Player UUID') }, style: { marginTop: 4 } },
+								T({ variant: 'text-xs/medium', style: { color: TEXT_MUTED } }, 'UUID: ' + p.uuid.slice(0, 18) + '... ⧉')
+							) : null
+						)
 					)
 				),
 				// 1. Operator Controls
-				T({ variant: 'eyebrow', style: { color: '#949ba4', marginBottom: 6 } }, 'OPERATOR PRIVILEGES'),
+				T({ variant: 'eyebrow', style: { color: TEXT_MUTED, marginBottom: 8 } }, 'OPERATOR PRIVILEGES'),
 				!isOp ? h(
 					RN.TouchableOpacity,
 					{
 						onPress: function () { runCmd('op ' + pName, 'Granted OP') },
-						style: { backgroundColor: GREEN, paddingVertical: 12, paddingHorizontal: 14, borderRadius: 8, alignItems: 'center', marginBottom: 14 }
+						style: { backgroundColor: GREEN, height: 40, borderRadius: 10, alignItems: 'center', justifyContent: 'center', marginBottom: 12 }
 					},
 					T({ variant: 'text-sm/bold', style: { color: '#ffffff' } }, '👑 Make Operator (/op ' + pName + ')')
 				) : h(
 					RN.TouchableOpacity,
 					{
 						onPress: function () { runCmd('deop ' + pName, 'Removed OP') },
-						style: { backgroundColor: RED, paddingVertical: 12, paddingHorizontal: 14, borderRadius: 8, alignItems: 'center', marginBottom: 14 }
+						style: { backgroundColor: RED, height: 40, borderRadius: 10, alignItems: 'center', justifyContent: 'center', marginBottom: 12 }
 					},
 					T({ variant: 'text-sm/bold', style: { color: '#ffffff' } }, '🛑 Remove Operator (/deop ' + pName + ')')
 				),
 				// 2. Whitelist Controls
-				T({ variant: 'eyebrow', style: { color: '#949ba4', marginBottom: 6 } }, 'WHITELIST MANAGEMENT'),
+				T({ variant: 'eyebrow', style: { color: TEXT_MUTED, marginBottom: 8 } }, 'WHITELIST MANAGEMENT'),
 				!isWl ? h(
 					RN.TouchableOpacity,
 					{
 						onPress: function () { runCmd('whitelist add ' + pName, 'Whitelisted') },
-						style: { backgroundColor: BLURPLE, paddingVertical: 12, paddingHorizontal: 14, borderRadius: 8, alignItems: 'center', marginBottom: 14 }
+						style: { backgroundColor: BLURPLE, height: 40, borderRadius: 10, alignItems: 'center', justifyContent: 'center', marginBottom: 12 }
 					},
 					T({ variant: 'text-sm/bold', style: { color: '#ffffff' } }, '✅ Add to Whitelist (/whitelist add)')
 				) : h(
 					RN.TouchableOpacity,
 					{
 						onPress: function () { runCmd('whitelist remove ' + pName, 'Removed from whitelist') },
-						style: { backgroundColor: AMBER, paddingVertical: 12, paddingHorizontal: 14, borderRadius: 8, alignItems: 'center', marginBottom: 14 }
+						style: { backgroundColor: AMBER, height: 40, borderRadius: 10, alignItems: 'center', justifyContent: 'center', marginBottom: 12 }
 					},
 					T({ variant: 'text-sm/bold', style: { color: '#111214' } }, '❌ Remove from Whitelist (/whitelist remove)')
 				),
 				// 3. Moderation Controls
-				T({ variant: 'eyebrow', style: { color: '#949ba4', marginBottom: 6 } }, 'MODERATION ACTIONS'),
+				T({ variant: 'eyebrow', style: { color: TEXT_MUTED, marginBottom: 8 } }, 'MODERATION ACTIONS'),
 				h(
 					RN.View,
-					{ style: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 14 } },
+					{ style: { flexDirection: 'row', marginBottom: 12 } },
 					h(
 						RN.TouchableOpacity,
 						{
 							onPress: function () { runCmd('kick ' + pName, 'Kicked') },
-							style: { flex: 1, backgroundColor: RED, paddingVertical: 12, borderRadius: 8, alignItems: 'center', marginHorizontal: 2 }
+							style: { flex: 1, height: 38, backgroundColor: RED, borderRadius: 10, alignItems: 'center', justifyContent: 'center', marginRight: 6 }
 						},
 						T({ variant: 'text-sm/bold', style: { color: '#ffffff' } }, '👢 Kick')
 					),
@@ -1145,7 +1324,7 @@
 						RN.TouchableOpacity,
 						{
 							onPress: function () { runCmd('ban ' + pName, 'Banned') },
-							style: { flex: 1, backgroundColor: '#800000', paddingVertical: 12, borderRadius: 8, alignItems: 'center', marginHorizontal: 2 }
+							style: { flex: 1, height: 38, backgroundColor: CRIMSON, borderRadius: 10, alignItems: 'center', justifyContent: 'center', marginRight: 6 }
 						},
 						T({ variant: 'text-sm/bold', style: { color: '#ffffff' } }, '🔨 Ban')
 					),
@@ -1153,39 +1332,39 @@
 						RN.TouchableOpacity,
 						{
 							onPress: function () { runCmd('pardon ' + pName, 'Unbanned') },
-							style: { flex: 1, backgroundColor: '#2b2d31', paddingVertical: 12, borderRadius: 8, alignItems: 'center', marginHorizontal: 2 }
+							style: { flex: 1, height: 38, backgroundColor: BG_RAISED, borderRadius: 10, alignItems: 'center', justifyContent: 'center' }
 						},
-						T({ variant: 'text-sm/bold', style: { color: '#dbdee1' } }, '🔓 Unban')
+						T({ variant: 'text-sm/bold', style: { color: TEXT_NORMAL } }, '🔓 Unban')
 					)
 				),
 				// 4. In-Game Interactions
-				T({ variant: 'eyebrow', style: { color: '#949ba4', marginBottom: 6 } }, 'IN-GAME INTERACTIONS'),
+				T({ variant: 'eyebrow', style: { color: TEXT_MUTED, marginBottom: 8 } }, 'IN-GAME INTERACTIONS'),
 				h(
 					RN.View,
-					{ style: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 20 } },
+					{ style: { flexDirection: 'row', marginBottom: 16 } },
 					h(
 						RN.TouchableOpacity,
 						{
 							onPress: function () { runCmd('tp ' + pName + ' 0 80 0', 'Teleported') },
-							style: { flex: 1, backgroundColor: '#2b2d31', paddingVertical: 10, borderRadius: 8, alignItems: 'center', marginHorizontal: 2 }
+							style: { flex: 1, height: 36, backgroundColor: BG_RAISED, borderRadius: 10, alignItems: 'center', justifyContent: 'center', marginRight: 6 }
 						},
-						T({ variant: 'text-xs/bold', style: { color: '#dbdee1' } }, '📍 Spawn TP')
+						T({ variant: 'text-xs/bold', style: { color: TEXT_NORMAL } }, '📍 Spawn TP')
 					),
 					h(
 						RN.TouchableOpacity,
 						{
 							onPress: function () { runCmd('gamemode survival ' + pName, 'Gamemode Survival') },
-							style: { flex: 1, backgroundColor: '#2b2d31', paddingVertical: 10, borderRadius: 8, alignItems: 'center', marginHorizontal: 2 }
+							style: { flex: 1, height: 36, backgroundColor: BG_RAISED, borderRadius: 10, alignItems: 'center', justifyContent: 'center', marginRight: 6 }
 						},
-						T({ variant: 'text-xs/bold', style: { color: '#dbdee1' } }, '🎮 Survival')
+						T({ variant: 'text-xs/bold', style: { color: TEXT_NORMAL } }, '🎮 Survival')
 					),
 					h(
 						RN.TouchableOpacity,
 						{
 							onPress: function () { runCmd('gamemode creative ' + pName, 'Gamemode Creative') },
-							style: { flex: 1, backgroundColor: '#2b2d31', paddingVertical: 10, borderRadius: 8, alignItems: 'center', marginHorizontal: 2 }
+							style: { flex: 1, height: 36, backgroundColor: BG_RAISED, borderRadius: 10, alignItems: 'center', justifyContent: 'center' }
 						},
-						T({ variant: 'text-xs/bold', style: { color: '#dbdee1' } }, '✨ Creative')
+						T({ variant: 'text-xs/bold', style: { color: TEXT_NORMAL } }, '✨ Creative')
 					)
 				)
 			)
@@ -1199,55 +1378,62 @@
 
 			var details = state.serverDetails[currentServerId] || {}
 			var address = (details.host || 'in-mum01.altare.global') + ':' + (details.port || 25297)
-			var gearAsset = valenced.assets.getAssetIdByName('SettingsIcon') || valenced.assets.getAssetIdByName('GearIcon')
 
 			return h(
 				RN.View,
-				{ style: { paddingHorizontal: 10 } },
+				{ style: { paddingHorizontal: 14 } },
 				// Header Card
 				h(
-					RN.View,
-					{ style: { backgroundColor: '#1e1f22', borderRadius: 12, padding: 14, marginBottom: 12 } },
+					Card,
+					null,
 					h(
 						RN.View,
 						{ style: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' } },
 						h(
 							RN.View,
 							null,
-							T({ variant: 'eyebrow', style: { color: '#949ba4' } }, 'MINECRAFT PLAYERS'),
-							T({ variant: 'heading-md/bold', style: { color: '#ffffff', marginTop: 2 } }, currentState === 'running' ? state.onlinePlayerCount + ' / ' + state.maxPlayerCount + ' Online' : 'Server is ' + currentState.toUpperCase()),
+							T({ variant: 'eyebrow', style: { color: TEXT_MUTED } }, 'MINECRAFT PLAYERS'),
+							T({ variant: 'heading-md/bold', style: { color: TEXT_NORMAL, marginTop: 2 } }, currentState === 'running' ? state.onlinePlayerCount + ' / ' + state.maxPlayerCount + ' Online' : 'Server is ' + currentState.toUpperCase()),
 							state.statusProvider && state.statusProvider !== 'none'
-								? T({ variant: 'text-xs/medium', style: { color: '#949ba4', marginTop: 2 } }, 'Via ' + state.statusProvider + ' (External Ping)')
+								? T({ variant: 'text-xs/medium', style: { color: TEXT_MUTED, marginTop: 2 } }, 'Via ' + state.statusProvider + ' (External Ping)')
 								: null
 						),
 						h(
 							RN.TouchableOpacity,
 							{
 								onPress: function () { fetchPlayers(currentServerId) },
-								style: { backgroundColor: '#2b2d31', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 8 }
+								style: { backgroundColor: BG_RAISED, height: 30, paddingHorizontal: 12, borderRadius: 8, alignItems: 'center', justifyContent: 'center' }
 							},
 							T({ variant: 'text-xs/bold', style: { color: BLURPLE } }, state.loadingPlayers ? 'Checking…' : '⟳ Refresh')
 						)
 					),
 					h(
-						RN.View,
-						{ style: { flexDirection: 'row', alignItems: 'center', marginTop: 8 } },
-						h(
-							RN.TouchableOpacity,
-							{ onPress: function () { copyText(address, 'Server address') } },
-							T({ variant: 'text-xs/medium', style: { color: '#949ba4' } }, 'Address: ' + address + '  ⧉')
-						)
+						RN.TouchableOpacity,
+						{
+							onPress: function () { copyText(address, 'Server address') },
+							style: {
+								flexDirection: 'row',
+								alignItems: 'center',
+								backgroundColor: BG_BASE,
+								height: 32,
+								paddingHorizontal: 10,
+								borderRadius: 8,
+								marginTop: 10
+							}
+						},
+						T({ variant: 'text-xs/semibold', style: { color: TEXT_MUTED, flex: 1 } }, 'Address: ' + address),
+						T({ variant: 'text-xs/bold', style: { color: BLURPLE } }, '⧉ Copy')
 					)
 				),
 				// Online Players Section
-				T({ variant: 'eyebrow', style: { color: '#949ba4', marginBottom: 8 } }, 'CURRENTLY ONLINE PLAYERS'),
+				T({ variant: 'eyebrow', style: { color: TEXT_MUTED, marginTop: 4, marginBottom: 8 } }, 'CURRENTLY ONLINE PLAYERS'),
 				state.onlinePlayers.length === 0 ? h(
-					RN.View,
-					{ style: { backgroundColor: '#1e1f22', borderRadius: 8, padding: 14, marginBottom: 14, alignItems: 'center' } },
-					T({ variant: 'text-sm/medium', style: { color: '#949ba4' } }, currentState === 'running' ? 'No players are currently online' : 'Server is offline')
+					Card,
+					{ style: { alignItems: 'center', paddingVertical: 20 } },
+					T({ variant: 'text-sm/medium', style: { color: TEXT_MUTED } }, currentState === 'running' ? 'No players are currently online' : 'Server is offline')
 				) : h(
-					D.TableRowGroup,
-					{ style: { marginBottom: 14 } },
+					RN.View,
+					{ style: { marginBottom: 10 } },
 					state.onlinePlayers.map(function (p) {
 						var pName = p.name || 'Player'
 						var pLower = pName.toLowerCase()
@@ -1255,36 +1441,63 @@
 						var isWl = state.whitelist.indexOf(pLower) !== -1
 						var headUrl = 'https://mc-heads.net/avatar/' + encodeURIComponent(pName) + '/40'
 						return h(
-							D.TableRow,
+							RN.View,
 							{
 								key: pName,
-								icon: h(RN.Image, { source: { uri: headUrl }, style: { width: 34, height: 34, borderRadius: 6 } }),
-								label: pName,
-								subLabel: (isOp ? '👑 Operator • ' : '') + (isWl ? '✅ Whitelisted • ' : '') + 'Online',
-								trailing: h(
-									RN.TouchableOpacity,
-									{
-										onPress: function () {
-											setSelectedPlayer({ name: pName, uuid: p.uuid, isOp: isOp, isWhitelisted: isWl })
-										},
-										style: { backgroundColor: '#2b2d31', padding: 8, borderRadius: 8, alignItems: 'center', justifyContent: 'center' }
-									},
-									gearAsset
-										? h(RN.Image, { source: gearAsset, style: { width: 18, height: 18, tintColor: '#dbdee1' } })
-										: T({ variant: 'text-sm/bold', style: { color: '#dbdee1' } }, '⚙️')
+								style: {
+									flexDirection: 'row',
+									alignItems: 'center',
+									backgroundColor: BG_SURFACE,
+									borderRadius: 12,
+									paddingHorizontal: 12,
+									paddingVertical: 10,
+									marginBottom: 8,
+									borderWidth: 1,
+									borderColor: BORDER_SUBTLE
+								}
+							},
+							h(RN.Image, { source: { uri: headUrl }, style: { width: 38, height: 38, borderRadius: 8, marginRight: 10 } }),
+							h(
+								RN.View,
+								{ style: { flex: 1 } },
+								T({ variant: 'heading-sm/bold', style: { color: TEXT_NORMAL } }, pName),
+								h(
+									RN.View,
+									{ style: { flexDirection: 'row', alignItems: 'center', marginTop: 2 } },
+									isOp ? h(
+										RN.View,
+										{ style: { backgroundColor: tint(AMBER, 0.2), paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6, marginRight: 4 } },
+										T({ variant: 'text-xs/bold', style: { color: AMBER } }, '👑 OP')
+									) : null,
+									isWl ? h(
+										RN.View,
+										{ style: { backgroundColor: tint(GREEN, 0.2), paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6, marginRight: 4 } },
+										T({ variant: 'text-xs/bold', style: { color: GREEN } }, '✓ Whitelist')
+									) : null,
+									!isOp && !isWl ? T({ variant: 'text-xs/medium', style: { color: GREEN } }, '● Online') : null
 								)
-							}
+							),
+							h(
+								RN.TouchableOpacity,
+								{
+									onPress: function () {
+										setSelectedPlayer({ name: pName, uuid: p.uuid, isOp: isOp, isWhitelisted: isWl })
+									},
+									style: { backgroundColor: BG_RAISED, width: 34, height: 34, borderRadius: 8, alignItems: 'center', justifyContent: 'center' }
+								},
+								T({ variant: 'text-sm/bold', style: { color: TEXT_MUTED } }, '⚙️')
+							)
 						)
 					})
 				),
 				// Registered Server Players (usercache.json)
-				T({ variant: 'eyebrow', style: { color: '#949ba4', marginBottom: 8 } }, 'REGISTERED PLAYERS (' + state.knownPlayers.length + ')'),
+				T({ variant: 'eyebrow', style: { color: TEXT_MUTED, marginTop: 6, marginBottom: 8 } }, 'REGISTERED PLAYERS (' + state.knownPlayers.length + ')'),
 				state.knownPlayers.length === 0 ? h(
-					RN.View,
-					{ style: { backgroundColor: '#1e1f22', borderRadius: 8, padding: 14, marginBottom: 14, alignItems: 'center' } },
-					T({ variant: 'text-sm/medium', style: { color: '#949ba4' } }, 'No player history cached yet in usercache.json')
+					Card,
+					{ style: { alignItems: 'center', paddingVertical: 20 } },
+					T({ variant: 'text-sm/medium', style: { color: TEXT_MUTED } }, 'No player history cached yet in usercache.json')
 				) : h(
-					D.TableRowGroup,
+					RN.View,
 					null,
 					state.knownPlayers.map(function (kp) {
 						var kpName = kp.name || 'Player'
@@ -1293,34 +1506,61 @@
 						var isWl = state.whitelist.indexOf(kpLower) !== -1
 						var headUrl = 'https://mc-heads.net/avatar/' + encodeURIComponent(kpName) + '/40'
 						return h(
-							D.TableRow,
+							RN.View,
 							{
 								key: kpName + '_' + kp.uuid,
-								icon: h(RN.Image, { source: { uri: headUrl }, style: { width: 34, height: 34, borderRadius: 6 } }),
-								label: kpName,
-								subLabel: (isOp ? '👑 Operator • ' : '') + (isWl ? '✅ Whitelisted • ' : '') + 'Registered User',
-								trailing: h(
-									RN.TouchableOpacity,
-									{
-										onPress: function () {
-											setSelectedPlayer({ name: kpName, uuid: kp.uuid, isOp: isOp, isWhitelisted: isWl })
-										},
-										style: { backgroundColor: '#2b2d31', padding: 8, borderRadius: 8, alignItems: 'center', justifyContent: 'center' }
-									},
-									gearAsset
-										? h(RN.Image, { source: gearAsset, style: { width: 18, height: 18, tintColor: '#dbdee1' } })
-										: T({ variant: 'text-sm/bold', style: { color: '#dbdee1' } }, '⚙️')
+								style: {
+									flexDirection: 'row',
+									alignItems: 'center',
+									backgroundColor: BG_SURFACE,
+									borderRadius: 12,
+									paddingHorizontal: 12,
+									paddingVertical: 10,
+									marginBottom: 8,
+									borderWidth: 1,
+									borderColor: BORDER_SUBTLE
+								}
+							},
+							h(RN.Image, { source: { uri: headUrl }, style: { width: 38, height: 38, borderRadius: 8, marginRight: 10 } }),
+							h(
+								RN.View,
+								{ style: { flex: 1 } },
+								T({ variant: 'heading-sm/bold', style: { color: TEXT_NORMAL } }, kpName),
+								h(
+									RN.View,
+									{ style: { flexDirection: 'row', alignItems: 'center', marginTop: 2 } },
+									isOp ? h(
+										RN.View,
+										{ style: { backgroundColor: tint(AMBER, 0.2), paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6, marginRight: 4 } },
+										T({ variant: 'text-xs/bold', style: { color: AMBER } }, '👑 OP')
+									) : null,
+									isWl ? h(
+										RN.View,
+										{ style: { backgroundColor: tint(GREEN, 0.2), paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6, marginRight: 4 } },
+										T({ variant: 'text-xs/bold', style: { color: GREEN } }, '✓ Whitelist')
+									) : null,
+									!isOp && !isWl ? T({ variant: 'text-xs/medium', style: { color: TEXT_MUTED } }, 'Registered User') : null
 								)
-							}
+							),
+							h(
+								RN.TouchableOpacity,
+								{
+									onPress: function () {
+										setSelectedPlayer({ name: kpName, uuid: kp.uuid, isOp: isOp, isWhitelisted: isWl })
+									},
+									style: { backgroundColor: BG_RAISED, width: 34, height: 34, borderRadius: 8, alignItems: 'center', justifyContent: 'center' }
+								},
+								T({ variant: 'text-sm/bold', style: { color: TEXT_MUTED } }, '⚙️')
+							)
 						)
 					})
 				)
 			)
 		}
 
-		// TAB 3: CONSOLE & COMMANDS (Direct non-nested scroll for silky smooth terminal interaction)
+		// TAB 3: CONSOLE & COMMANDS (Modern IDE-Style Terminal)
 		function renderConsoleTab() {
-			var presets = ['/list', '/tps', '/whitelist list', '/say Hello!', '/save-all']
+			var presets = ['/list', '/tps', '/whitelist list', '/say Hello!', '/save-all', '/weather clear', '/time set day']
 
 			var displayText = state.logs || 'No logs fetched yet. Tap Refresh Logs above.'
 			if (state.logLines && state.logLines.length > 0) {
@@ -1332,20 +1572,26 @@
 				}
 			}
 
-			var logHeight = Math.max(220, sheetMinHeight - 170)
+			var logHeight = Math.max(200, sheetMinHeight - 195)
 
 			return h(
 				RN.View,
-				{ style: { flex: 1, paddingHorizontal: 10 } },
-				T({ variant: 'eyebrow', style: { color: '#949ba4', marginBottom: 6 } }, 'EXECUTE CONSOLE COMMAND'),
+				{ style: { flex: 1, paddingHorizontal: 14, paddingBottom: 16 } },
+				// Command Input Bar
 				h(
 					RN.View,
-					{ style: { flexDirection: 'row', marginBottom: 10, alignItems: 'center' } },
+					{
+						style: {
+							flexDirection: 'row',
+							alignItems: 'center',
+							marginBottom: 10
+						}
+					},
 					h(
 						RN.View,
 						{ style: { flex: 1, marginRight: 8 } },
 						h(D.TextInput, {
-							placeholder: 'e.g. /say Hi or /whitelist add...',
+							placeholder: 'Console command (e.g. /say Hello)...',
 							value: commandText,
 							onChange: function (val) { setCommandText(val) }
 						})
@@ -1359,32 +1605,82 @@
 									setCommandText('')
 								}
 							},
-							style: { backgroundColor: BLURPLE, paddingHorizontal: 16, paddingVertical: 12, borderRadius: 8 }
+							style: { backgroundColor: BLURPLE, paddingHorizontal: 16, height: 40, borderRadius: 10, alignItems: 'center', justifyContent: 'center' }
 						},
 						T({ variant: 'text-sm/bold', style: { color: '#ffffff' } }, 'Send')
 					)
 				),
-				// Presets Chips
+				// Modern Sleek Pill Bar
 				h(
 					RN.View,
-					{ style: { flexDirection: 'row', flexWrap: 'wrap', marginBottom: 10 } },
-					presets.map(function (p) {
-						return h(
-							RN.TouchableOpacity,
-							{
-								key: p,
-								onPress: function () { setCommandText(p) },
-								style: { backgroundColor: '#2b2d31', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 14, marginRight: 6, marginBottom: 6 }
-							},
-							T({ variant: 'text-xs/medium', style: { color: '#dbdee1' } }, p)
-						)
-					})
+					{ style: { marginBottom: 10 } },
+					h(
+						RN.ScrollView,
+						{
+							horizontal: true,
+							showsHorizontalScrollIndicator: false,
+							contentContainerStyle: { alignItems: 'center' }
+						},
+						presets.map(function (p) {
+							return h(
+								RN.TouchableOpacity,
+								{
+									key: p,
+									onPress: function () { setCommandText(p) },
+									style: {
+										flexDirection: 'row',
+										alignItems: 'center',
+										justifyContent: 'center',
+										height: 28,
+										paddingHorizontal: 10,
+										borderRadius: 14,
+										backgroundColor: BG_RAISED,
+										borderWidth: 1,
+										borderColor: BORDER_SUBTLE,
+										marginRight: 6
+									}
+								},
+								T({
+									variant: 'text-xs/medium',
+									style: {
+										color: TEXT_NORMAL,
+										includeFontPadding: false,
+										textAlignVertical: 'center',
+										fontSize: 12,
+										lineHeight: 14
+									}
+								}, p)
+							)
+						})
+					)
 				),
-				// Server Log Header with controls
+				// Terminal Header Controls Bar
 				h(
 					RN.View,
-					{ style: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 } },
-					T({ variant: 'eyebrow', style: { color: '#949ba4' } }, 'SERVER LOGS (latest.log)'),
+					{
+						style: {
+							flexDirection: 'row',
+							justifyContent: 'space-between',
+							alignItems: 'center',
+							backgroundColor: '#0c0d0e',
+							borderTopLeftRadius: 12,
+							borderTopRightRadius: 12,
+							height: 36,
+							paddingHorizontal: 12,
+							borderWidth: 1,
+							borderBottomWidth: 0,
+							borderColor: BORDER_SUBTLE
+						}
+					},
+					// Colored Terminal Dots
+					h(
+						RN.View,
+						{ style: { flexDirection: 'row', alignItems: 'center' } },
+						h(RN.View, { style: { width: 8, height: 8, borderRadius: 4, backgroundColor: RED, marginRight: 5 } }),
+						h(RN.View, { style: { width: 8, height: 8, borderRadius: 4, backgroundColor: AMBER, marginRight: 5 } }),
+						h(RN.View, { style: { width: 8, height: 8, borderRadius: 4, backgroundColor: GREEN, marginRight: 8 } }),
+						T({ variant: 'text-xs/bold', style: { color: TEXT_MUTED } }, 'latest.log')
+					),
 					h(
 						RN.View,
 						{ style: { flexDirection: 'row', alignItems: 'center' } },
@@ -1394,9 +1690,9 @@
 								onPress: function () {
 									setLogOrder(logOrder === 'bottom' ? 'top' : 'bottom')
 								},
-								style: { backgroundColor: '#2b2d31', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8, marginRight: 6 }
+								style: { backgroundColor: BG_RAISED, paddingHorizontal: 8, height: 26, borderRadius: 6, alignItems: 'center', justifyContent: 'center', marginRight: 6 }
 							},
-							T({ variant: 'text-xs/bold', style: { color: '#dbdee1' } }, logOrder === 'bottom' ? '⇅ Newest at Top' : '⇅ Chronological')
+							T({ variant: 'text-xs/bold', style: { color: TEXT_NORMAL } }, logOrder === 'bottom' ? '⇅ Newest Top' : '⇅ Chronological')
 						),
 						logOrder === 'bottom' ? h(
 							RN.TouchableOpacity,
@@ -1406,32 +1702,37 @@
 										logScrollRef.current.scrollToEnd({ animated: true })
 									}
 								},
-								style: { backgroundColor: '#2b2d31', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8, marginRight: 6 }
+								style: { backgroundColor: BG_RAISED, paddingHorizontal: 8, height: 26, borderRadius: 6, alignItems: 'center', justifyContent: 'center', marginRight: 6 }
 							},
-							T({ variant: 'text-xs/bold', style: { color: '#dbdee1' } }, '↓ End')
+							T({ variant: 'text-xs/bold', style: { color: TEXT_NORMAL } }, '↓ End')
 						) : null,
 						h(
 							RN.TouchableOpacity,
-							{ onPress: function () { fetchLogs(currentServerId) } },
-							T({ variant: 'text-xs/bold', style: { color: BLURPLE } }, state.loadingLogs ? 'Loading...' : '⟳ Refresh')
+							{
+								onPress: function () { fetchLogs(currentServerId) },
+								style: { backgroundColor: BG_RAISED, paddingHorizontal: 8, height: 26, borderRadius: 6, alignItems: 'center', justifyContent: 'center' }
+							},
+							T({ variant: 'text-xs/bold', style: { color: BLURPLE } }, state.loadingLogs ? '...' : '⟳ Refresh')
 						)
 					)
 				),
-				// Direct ScrollView for Logs (No parent scroll conflicts!)
+				// Terminal Output Screen
 				scrollView(
 					RN,
 					{
 						ref: logScrollRef,
 						style: {
 							height: logHeight,
-							backgroundColor: '#111214',
-							borderRadius: 8,
+							backgroundColor: '#090a0b',
+							borderBottomLeftRadius: 12,
+							borderBottomRightRadius: 12,
 							borderWidth: 1,
-							borderColor: '#2b2d31'
+							borderTopWidth: 0,
+							borderColor: BORDER_SUBTLE
 						},
 						contentContainerStyle: {
 							padding: 10,
-							paddingBottom: 24,
+							paddingBottom: 20,
 							flexGrow: 1
 						},
 						keyboardShouldPersistTaps: 'handled',
@@ -1447,12 +1748,12 @@
 		function renderFilesTab() {
 			return h(
 				RN.View,
-				{ style: { paddingHorizontal: 10 } },
-				// Breadcrumbs & Navigation
+				{ style: { paddingHorizontal: 14 } },
+				// Breadcrumb Navigation Card
 				h(
-					RN.View,
-					{ style: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 } },
-					T({ variant: 'text-sm/bold', style: { color: '#f2f3f5' } }, 'Path: ' + state.currentDir),
+					Card,
+					{ style: { paddingVertical: 10, paddingHorizontal: 12, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 } },
+					T({ variant: 'text-sm/bold', style: { color: TEXT_NORMAL } }, '📁 ' + state.currentDir),
 					state.currentDir !== '/' ? h(
 						RN.TouchableOpacity,
 						{
@@ -1462,28 +1763,31 @@
 								var parentDir = parts.join('/') || '/'
 								fetchFiles(currentServerId, parentDir)
 							},
-							style: { backgroundColor: '#2b2d31', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 12 }
+							style: { backgroundColor: BG_RAISED, height: 28, paddingHorizontal: 10, borderRadius: 6, alignItems: 'center', justifyContent: 'center' }
 						},
-						T({ variant: 'text-xs/bold', style: { color: BLURPLE } }, '↑ Up')
+						T({ variant: 'text-xs/bold', style: { color: BLURPLE } }, '↑ Parent Folder')
 					) : null
 				),
-				// File list directly inside sheet scroll view
-				state.loadingFiles ? T({ variant: 'text-sm/medium', style: { color: '#949ba4', textAlign: 'center', marginVertical: 30 } }, 'Loading directory contents...') :
-				h(
-					D.TableRowGroup,
+				// File list
+				state.loadingFiles ? h(
+					Card,
+					{ style: { alignItems: 'center', paddingVertical: 30 } },
+					T({ variant: 'text-sm/medium', style: { color: TEXT_MUTED } }, 'Loading directory contents…')
+				) : state.files.length === 0 ? h(
+					Card,
+					{ style: { alignItems: 'center', paddingVertical: 30 } },
+					T({ variant: 'text-sm/medium', style: { color: TEXT_MUTED } }, 'No files or folders in this directory')
+				) : h(
+					RN.View,
 					null,
-					state.files.length === 0 ? h(
-						D.TableRow,
-						{ label: '(Empty directory)', subLabel: 'No files or folders found' }
-					) : state.files.map(function (f) {
+					state.files.map(function (f) {
 						var isDir = !f.is_file
 						var fullPath = (state.currentDir === '/' ? '/' : state.currentDir + '/') + f.name
+						var iconEmoji = isDir ? '📁' : f.name.endsWith('.log') || f.name.endsWith('.txt') ? '📄' : f.name.endsWith('.json') || f.name.endsWith('.properties') || f.name.endsWith('.yml') ? '⚙️' : '📦'
 						return h(
-							D.TableRow,
+							RN.TouchableOpacity,
 							{
 								key: f.name,
-								label: (isDir ? '📁 ' : '📄 ') + f.name,
-								subLabel: isDir ? 'Directory' : formatBytes(f.size),
 								onPress: function () {
 									if (isDir) {
 										fetchFiles(currentServerId, fullPath)
@@ -1495,8 +1799,27 @@
 											toast('Read error: ' + errorText(err))
 										})
 									}
+								},
+								style: {
+									flexDirection: 'row',
+									alignItems: 'center',
+									backgroundColor: BG_SURFACE,
+									borderRadius: 12,
+									paddingHorizontal: 12,
+									paddingVertical: 10,
+									marginBottom: 8,
+									borderWidth: 1,
+									borderColor: BORDER_SUBTLE
 								}
-							}
+							},
+							T({ variant: 'heading-md/bold', style: { marginRight: 10, fontSize: 18 } }, iconEmoji),
+							h(
+								RN.View,
+								{ style: { flex: 1 } },
+								T({ variant: 'text-sm/bold', style: { color: TEXT_NORMAL } }, f.name),
+								T({ variant: 'text-xs/medium', style: { color: TEXT_MUTED, marginTop: 2 } }, isDir ? 'Directory' : formatBytes(f.size))
+							),
+							T({ variant: 'text-sm/bold', style: { color: TEXT_MUTED } }, '›')
 						)
 					})
 				)
@@ -1510,14 +1833,16 @@
 		function renderSettingsTab() {
 			return h(
 				RN.View,
-				{ style: { paddingHorizontal: 10 } },
+				{ style: { paddingHorizontal: 14 } },
+				// Custom Server Nickname Card
 				h(
-					D.TableRowGroup,
-					{ title: 'Server Custom Nickname (Local Only)' },
+					Card,
+					null,
+					T({ variant: 'eyebrow', style: { color: TEXT_MUTED, marginBottom: 4 } }, 'SERVER DISPLAY NICKNAME'),
+					T({ variant: 'text-xs/medium', style: { color: TEXT_MUTED, marginBottom: 8 } }, 'Set a custom nickname inside the plugin only:'),
 					h(
 						RN.View,
-						{ style: { padding: 10 } },
-						T({ variant: 'text-xs/medium', style: { color: '#949ba4', marginBottom: 4 } }, 'Custom Name for ' + selectedServer.name),
+						{ style: { backgroundColor: BG_BASE, borderRadius: 10, height: 42, paddingHorizontal: 10, borderWidth: 1, borderColor: BORDER_SUBTLE, marginBottom: 10, justifyContent: 'center' } },
 						h(D.TextInput, {
 							defaultValue: serverDisplayName,
 							placeholder: selectedServer.name,
@@ -1525,43 +1850,45 @@
 						})
 					),
 					h(
-						D.TableRow,
-						{
-							label: 'Save Custom Nickname',
-							subLabel: 'Changes name inside this plugin only without modifying panel',
-							onPress: function () {
-								setServerAlias(currentServerId, aliasInputRef.current)
-							}
-						}
-					),
-					serverDisplayName !== selectedServer.name ? h(
-						D.TableRow,
-						{
-							label: 'Reset to Original Name',
-							subLabel: 'Restores default: ' + selectedServer.name,
-							onPress: function () {
-								setServerAlias(currentServerId, '')
-							}
-						}
-					) : null
+						RN.View,
+						{ style: { flexDirection: 'row', justifyContent: 'flex-end', alignItems: 'center' } },
+						serverDisplayName !== selectedServer.name ? h(
+							RN.TouchableOpacity,
+							{
+								onPress: function () { setServerAlias(currentServerId, '') },
+								style: { backgroundColor: BG_RAISED, height: 34, paddingHorizontal: 14, borderRadius: 8, alignItems: 'center', justifyContent: 'center', marginRight: 8 }
+							},
+							T({ variant: 'text-xs/bold', style: { color: TEXT_MUTED } }, 'Reset')
+						) : null,
+						h(
+							RN.TouchableOpacity,
+							{
+								onPress: function () { setServerAlias(currentServerId, aliasInputRef.current) },
+								style: { backgroundColor: BLURPLE, height: 34, paddingHorizontal: 16, borderRadius: 8, alignItems: 'center', justifyContent: 'center' }
+							},
+							T({ variant: 'text-xs/bold', style: { color: '#ffffff' } }, 'Save Nickname')
+						)
+					)
 				),
+				// Pterodactyl Panel Connection Card
 				h(
-					D.TableRowGroup,
-					{ title: 'Pterodactyl Panel Connection' },
+					Card,
+					null,
+					T({ variant: 'eyebrow', style: { color: TEXT_MUTED, marginBottom: 4 } }, 'PTERODACTYL CONNECTION'),
+					T({ variant: 'text-xs/medium', style: { color: TEXT_MUTED, marginBottom: 6 } }, 'Panel Base URL:'),
 					h(
 						RN.View,
-						{ style: { padding: 10 } },
-						T({ variant: 'text-xs/medium', style: { color: '#949ba4', marginBottom: 4 } }, 'Panel Base URL (e.g. https://panel.example.com)'),
+						{ style: { backgroundColor: BG_BASE, borderRadius: 10, height: 42, paddingHorizontal: 10, borderWidth: 1, borderColor: BORDER_SUBTLE, marginBottom: 10, justifyContent: 'center' } },
 						h(D.TextInput, {
 							defaultValue: getPanelUrl(),
 							placeholder: 'https://panel.altare.global',
 							onChange: function (val) { urlInputRef.current = val }
 						})
 					),
+					T({ variant: 'text-xs/medium', style: { color: TEXT_MUTED, marginBottom: 6 } }, 'Client API Key (ptlc_...):'),
 					h(
 						RN.View,
-						{ style: { padding: 10 } },
-						T({ variant: 'text-xs/medium', style: { color: '#949ba4', marginBottom: 4 } }, 'Client API Key (ptlc_...)'),
+						{ style: { backgroundColor: BG_BASE, borderRadius: 10, height: 42, paddingHorizontal: 10, borderWidth: 1, borderColor: BORDER_SUBTLE, marginBottom: 10, justifyContent: 'center' } },
 						h(D.TextInput, {
 							defaultValue: getApiKey(),
 							placeholder: 'ptlc_...',
@@ -1570,10 +1897,8 @@
 						})
 					),
 					h(
-						D.TableRow,
+						RN.TouchableOpacity,
 						{
-							label: 'Save Credentials',
-							subLabel: 'Normalizes URL and clears cached web sessions',
 							onPress: function () {
 								saveSetting({
 									panelUrl: urlInputRef.current,
@@ -1581,23 +1906,24 @@
 								})
 								toast('Pterodactyl credentials saved!')
 								fetchServers().catch(function () {})
-							}
-						}
+							},
+							style: { backgroundColor: BLURPLE, height: 38, borderRadius: 10, alignItems: 'center', justifyContent: 'center' }
+						},
+						T({ variant: 'text-sm/bold', style: { color: '#ffffff' } }, 'Save Connection')
 					)
 				),
-				// Server Selector if multiple servers exist
+				// Server Switcher Cards
 				state.servers.length > 1 ? h(
-					D.TableRowGroup,
-					{ title: 'Switch Active Server' },
+					Card,
+					null,
+					T({ variant: 'eyebrow', style: { color: TEXT_MUTED, marginBottom: 8 } }, 'SWITCH ACTIVE SERVER'),
 					state.servers.map(function (s) {
 						var active = s.id === currentServerId
 						var sDisp = getServerDisplayName(s)
 						return h(
-							D.TableRow,
+							RN.TouchableOpacity,
 							{
 								key: s.id,
-								label: (active ? '✓ ' : '') + sDisp,
-								subLabel: 'ID: ' + s.id + (sDisp !== s.name ? ' (' + s.name + ')' : ''),
 								onPress: function () {
 									state.selectedServerId = s.id
 									saveSetting({ defaultServerId: s.id })
@@ -1605,8 +1931,30 @@
 									fetchResources(s.id)
 									fetchServerDetails(s.id)
 									toast('Selected: ' + sDisp)
+								},
+								style: {
+									flexDirection: 'row',
+									alignItems: 'center',
+									backgroundColor: active ? tint(BLURPLE, 0.15) : BG_RAISED,
+									borderRadius: 10,
+									paddingHorizontal: 12,
+									paddingVertical: 10,
+									marginBottom: 8,
+									borderWidth: 1,
+									borderColor: active ? BLURPLE : BORDER_SUBTLE
 								}
-							}
+							},
+							h(
+								RN.View,
+								{ style: { flex: 1 } },
+								T({ variant: 'text-sm/bold', style: { color: active ? '#ffffff' : TEXT_NORMAL } }, sDisp),
+								T({ variant: 'text-xs/medium', style: { color: TEXT_MUTED } }, 'ID: ' + s.id + (s.node ? ' • ' + s.node : ''))
+							),
+							active ? h(
+								RN.View,
+								{ style: { backgroundColor: BLURPLE, width: 22, height: 22, borderRadius: 11, alignItems: 'center', justifyContent: 'center' } },
+								T({ variant: 'text-xs/bold', style: { color: '#ffffff' } }, '✓')
+							) : null
 						)
 					})
 				) : null
@@ -1615,10 +1963,7 @@
 
 		return h(
 			D.ActionSheet,
-			{
-				title: 'Pterodactyl Controller',
-				subLabel: serverDisplayName + ' (' + currentState.toUpperCase() + ')'
-			},
+			null,
 			renderTabs(),
 			activeTab === 'console'
 				? h(RN.View, { style: { height: sheetMinHeight } }, renderConsoleTab())
@@ -1630,7 +1975,7 @@
 							maxHeight: sheetMaxHeight
 						},
 						contentContainerStyle: {
-							paddingBottom: 28
+							paddingBottom: 32
 						},
 						keyboardShouldPersistTaps: 'handled',
 						nestedScrollEnabled: true,
@@ -1724,7 +2069,7 @@
 			h(
 				valenced.react.ReactNative.View,
 				{ style: { padding: 12 } },
-				T({ variant: 'text-xs/medium', style: { color: '#949ba4', marginBottom: 4 } }, 'Panel Base URL (e.g. https://panel.example.com)'),
+				T({ variant: 'text-xs/medium', style: { color: TEXT_MUTED, marginBottom: 4 } }, 'Panel Base URL (e.g. https://panel.example.com)'),
 				h(D.TextInput, {
 					defaultValue: getPanelUrl(),
 					placeholder: 'https://panel.altare.global',
@@ -1734,7 +2079,7 @@
 			h(
 				valenced.react.ReactNative.View,
 				{ style: { padding: 12 } },
-				T({ variant: 'text-xs/medium', style: { color: '#949ba4', marginBottom: 4 } }, 'Client API Key'),
+				T({ variant: 'text-xs/medium', style: { color: TEXT_MUTED, marginBottom: 4 } }, 'Client API Key'),
 				h(D.TextInput, {
 					defaultValue: getApiKey(),
 					placeholder: 'ptlc_...',
